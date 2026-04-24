@@ -35,9 +35,10 @@ export function Landing() {
             setRecentGames(data)
           }
         })
+        .catch(err => console.error('Error fetching recent games:', err))
     }
 
-    // Fetch global stats
+    // Fetch global stats (with error handling for unauthenticated requests)
     supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
@@ -45,6 +46,10 @@ export function Landing() {
         if (count !== null) {
           setStats(prev => ({ ...prev, totalPlayers: count }))
         }
+      })
+      .catch(() => {
+        // Silently fail for unauthenticated requests - optional display
+        setStats(prev => ({ ...prev, totalPlayers: 0 }))
       })
 
     supabase
@@ -54,6 +59,10 @@ export function Landing() {
         if (count !== null) {
           setStats(prev => ({ ...prev, questionsAnswered: count }))
         }
+      })
+      .catch(() => {
+        // Silently fail for unauthenticated requests - optional display
+        setStats(prev => ({ ...prev, questionsAnswered: 0 }))
       })
   }, [user, profile])
 
