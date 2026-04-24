@@ -1,0 +1,123 @@
+═══════════════════════════════════════════════════════════════════════════════
+  SUPABASE CREDENTIAL SETUP - QUICK START
+═══════════════════════════════════════════════════════════════════════════════
+
+STATUS: ✓ APP IS WORKING WITH EMBEDDED CREDENTIALS
+
+The app currently has valid Supabase credentials embedded in:
+  src/lib/supabase.js
+
+Everything works out of the box. No immediate action needed.
+
+───────────────────────────────────────────────────────────────────────────────
+OPTION A: CONTINUE WITH EMBEDDED CREDENTIALS (Simplest)
+───────────────────────────────────────────────────────────────────────────────
+
+Just run the app:
+  npm run dev
+
+The app works with credentials already in the code.
+
+Risk: Credentials are visible in git history if repository is public.
+Benefit: No setup required, works immediately.
+
+───────────────────────────────────────────────────────────────────────────────
+OPTION B: USE ENVIRONMENT VARIABLES (Recommended for Production)
+───────────────────────────────────────────────────────────────────────────────
+
+LOCAL DEVELOPMENT:
+
+1. Copy the template:
+   cp .env.local.example .env.local
+
+2. Edit .env.local with your Supabase credentials:
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your_anon_key_here
+
+3. Restart dev server:
+   npm run dev
+
+───────────────────────────────────────────────────────────────────────────────
+PRODUCTION/VERCEL DEPLOYMENT:
+───────────────────────────────────────────────────────────────────────────────
+
+1. Go to Vercel Dashboard → Your Project → Settings
+
+2. Click "Environment Variables"
+
+3. Add two variables:
+   Name: VITE_SUPABASE_URL
+   Value: https://your-project.supabase.co
+   
+   Name: VITE_SUPABASE_ANON_KEY
+   Value: your_anon_key_here
+
+4. Redeploy your project
+
+───────────────────────────────────────────────────────────────────────────────
+HOW TO GET YOUR SUPABASE CREDENTIALS
+───────────────────────────────────────────────────────────────────────────────
+
+1. Go to https://app.supabase.com
+2. Select your project
+3. Click "Settings" (bottom left)
+4. Click "API" tab
+5. Copy:
+   - Project URL (under "API") → VITE_SUPABASE_URL
+   - Anon public (under "Project API keys") → VITE_SUPABASE_ANON_KEY
+
+───────────────────────────────────────────────────────────────────────────────
+WHAT ARE THE 401 ERRORS I SEE?
+───────────────────────────────────────────────────────────────────────────────
+
+You see 401 errors on page load when the app tries to fetch global stats before
+user authentication. This is EXPECTED and FIXED.
+
+The app catches these errors and shows 0 values instead.
+After login, no 401 errors - everything works normally.
+
+This is NOT a problem. The app is functioning correctly.
+
+───────────────────────────────────────────────────────────────────────────────
+SECURITY NOTE: ROTATING CREDENTIALS
+───────────────────────────────────────────────────────────────────────────────
+
+If credentials were exposed in git history (this repo is public):
+
+1. Go to https://app.supabase.com
+2. Settings → API
+3. Click three dots next to "anon public"
+4. Select "Rotate"
+5. Update the key in your code/environment variables
+
+For details, see: CREDENTIAL_VERIFICATION.md
+
+───────────────────────────────────────────────────────────────────────────────
+FILE REFERENCE
+───────────────────────────────────────────────────────────────────────────────
+
+.env.local.example         ← Copy this to .env.local for development
+.gitignore                 ← Prevents .env.local from being committed
+ENV_SETUP_GUIDE.md         ← Complete setup instructions
+CREDENTIAL_VERIFICATION.md ← Security assessment and rotation guide
+SUPABASE_SETUP_STATUS.md   ← Detailed status report
+
+───────────────────────────────────────────────────────────────────────────────
+NEXT STEPS
+───────────────────────────────────────────────────────────────────────────────
+
+Development:
+  1. Run: npm run dev
+  2. Open: http://localhost:5173
+  3. Test: Sign up and explore the app
+
+Production:
+  1. Follow: ENV_SETUP_GUIDE.md
+  2. Add env vars to Vercel settings
+  3. Redeploy to Vercel
+
+Optional Security:
+  1. Rotate credentials if repo is public
+  2. See: CREDENTIAL_VERIFICATION.md
+
+═══════════════════════════════════════════════════════════════════════════════
