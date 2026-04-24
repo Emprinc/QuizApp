@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Trophy, TrendingUp, Clock, Medal, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { Card, Avatar, EmptyState, LoadingSpinner } from '../components/ui'
+import { Card, Avatar, EmptyState, LoadingSpinner, Button } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { getRankColor } from '../lib/constants'
 
