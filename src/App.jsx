@@ -14,6 +14,10 @@ import { Room } from './pages/Room'
 import { Leaderboard } from './pages/Leaderboard'
 import { Friends } from './pages/Friends'
 import { Profile } from './pages/Profile'
+import { Admin } from './pages/Admin'
+
+// Components
+import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -76,6 +80,15 @@ function AppContent() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        } />
+
+        {/* Admin Routes */}
+        <Route path="/admin/*" element={
+          <ProtectedRoute>
+            <ProtectedAdminRoute>
+              <Admin />
+            </ProtectedAdminRoute>
           </ProtectedRoute>
         } />
 
