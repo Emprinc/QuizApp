@@ -61,6 +61,15 @@ export const adminQuestionUtils = {
     
     if (error) throw error
     return data
+  },
+
+  async getTotalQuestionsCount() {
+    const { count, error } = await supabase
+      .from('questions')
+      .select('*', { count: 'exact', head: true })
+
+    if (error) throw error
+    return count || 0
   }
 }
 
@@ -200,7 +209,7 @@ export const adminAnalyticsUtils = {
     const totalGames = rooms.length
     const finishedGames = rooms.filter(r => r.status === 'finished').length
     const totalAnswers = answers.length
-    const correctAnswers = answers.filter(a => a.is_correct).true
+    const correctAnswers = answers.filter(a => a.is_correct).length
     const accuracy = correctAnswers / totalAnswers * 100
 
     return {

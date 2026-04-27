@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   username TEXT UNIQUE NOT NULL,
   email TEXT,
   avatar_url TEXT,
+  is_admin BOOLEAN DEFAULT FALSE,
+  is_banned BOOLEAN DEFAULT FALSE,
   total_games INTEGER DEFAULT 0,
   total_wins INTEGER DEFAULT 0,
   total_score INTEGER DEFAULT 0,
@@ -146,6 +148,7 @@ ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
 -- Profiles policies
 CREATE POLICY "Public profiles are viewable by everyone"
   ON public.profiles FOR SELECT
+  TO anon, authenticated
   USING (true);
 
 CREATE POLICY "Users can update own profile"
@@ -157,9 +160,10 @@ CREATE POLICY "Users can insert own profile"
   WITH CHECK (auth.uid() = id);
 
 -- Questions policies (read-only for all authenticated users)
-CREATE POLICY "Questions are viewable by authenticated users"
+-- Questions policies (read-only for everyone)
+CREATE POLICY "Questions are viewable by everyone"
   ON public.questions FOR SELECT
-  TO authenticated
+  TO anon, authenticated
   USING (true);
 
 -- Rooms policies

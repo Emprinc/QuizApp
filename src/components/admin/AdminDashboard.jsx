@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Users, HelpCircle, Zap, TrendingUp } from 'lucide-react'
-import { adminAnalyticsUtils } from '../../lib/adminUtils'
+import { adminAnalyticsUtils, adminQuestionUtils } from '../../lib/adminUtils'
 import { Card, LoadingSpinner } from '../ui'
 
 export function AdminDashboard() {
@@ -18,14 +18,16 @@ export function AdminDashboard() {
       setLoading(true)
       setError(null)
 
-      const [gameStats, userStats] = await Promise.all([
+      const [gameStats, userStats, totalQuestions] = await Promise.all([
         adminAnalyticsUtils.getGameStats(),
-        adminAnalyticsUtils.getUserStats()
+        adminAnalyticsUtils.getUserStats(),
+        adminQuestionUtils.getTotalQuestionsCount()
       ])
 
       setStats({
         ...gameStats,
-        ...userStats
+        ...userStats,
+        totalQuestions
       })
     } catch (err) {
       setError(err.message)
@@ -72,7 +74,7 @@ export function AdminDashboard() {
     {
       icon: HelpCircle,
       label: 'Total Questions',
-      value: stats?.['?'] || 'N/A',
+      value: stats?.totalQuestions || 0,
       color: 'from-purple-500 to-pink-500'
     }
   ]

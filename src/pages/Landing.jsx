@@ -38,32 +38,34 @@ export function Landing() {
         .catch(err => console.error('Error fetching recent games:', err))
     }
 
-    // Fetch global stats (with error handling for unauthenticated requests)
-    supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .then(({ count }) => {
-        if (count !== null) {
-          setStats(prev => ({ ...prev, totalPlayers: count }))
-        }
-      })
-      .catch(() => {
-        // Silently fail for unauthenticated requests - optional display
-        setStats(prev => ({ ...prev, totalPlayers: 0 }))
-      })
+    // Fetch global stats
+    const fetchGlobalStats = async () => {
+      try {
+        const { count: profilesCount } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
 
-    supabase
-      .from('questions')
-      .select('id', { count: 'exact', head: true })
-      .then(({ count }) => {
-        if (count !== null) {
-          setStats(prev => ({ ...prev, questionsAnswered: count }))
+        if (profilesCount !== null) {
+          setStats(prev => ({ ...prev, totalPlayers: profilesCount }))
         }
-      })
-      .catch(() => {
-        // Silently fail for unauthenticated requests - optional display
-        setStats(prev => ({ ...prev, questionsAnswered: 0 }))
-      })
+      } catch (err) {
+        console.error('Error fetching profiles count:', err)
+      }
+
+      try {
+        const { count: questionsCount } = await supabase
+          .from('questions')
+          .select('*', { count: 'exact', head: true })
+
+        if (questionsCount !== null) {
+          setStats(prev => ({ ...prev, questionsAnswered: questionsCount }))
+        }
+      } catch (err) {
+        console.error('Error fetching questions count:', err)
+      }
+    }
+
+    fetchGlobalStats()
   }, [user, profile])
 
   const features = [
