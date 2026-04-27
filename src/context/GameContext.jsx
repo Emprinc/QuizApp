@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { generateRoomCode, GAME_STATES } from '../lib/constants'
 import { useAuth } from './AuthContext'
@@ -253,6 +254,10 @@ export function GameProvider({ children }) {
 
     if (!questions || questions.length === 0) {
       throw new Error('No questions available for this category')
+    }
+
+    if (questions.length < currentRoom.question_count) {
+      toast.error(`Only ${questions.length} questions available in this category.`)
     }
 
     // Shuffle and store questions

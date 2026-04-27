@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   username TEXT UNIQUE NOT NULL,
   email TEXT,
   avatar_url TEXT,
+  is_admin BOOLEAN DEFAULT FALSE,
+  is_banned BOOLEAN DEFAULT FALSE,
   total_games INTEGER DEFAULT 0,
   total_wins INTEGER DEFAULT 0,
   total_score INTEGER DEFAULT 0,
