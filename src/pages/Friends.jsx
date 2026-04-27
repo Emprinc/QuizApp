@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { Users, UserPlus, Check, X, Clock, Sword, Trophy } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Card, Avatar, Button, EmptyState, LoadingSpinner, Modal, Input } from '../components/ui'
@@ -7,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export function Friends() {
+  const navigate = useNavigate()
   const { user, profile } = useAuth()
   const [friends, setFriends] = useState([])
   const [requests, setRequests] = useState([])
@@ -227,7 +229,7 @@ export function Friends() {
                       </div>
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="secondary" onClick={() => setShowAddModal(true)}>
+                      <Button size="sm" variant="secondary" onClick={() => navigate('/lobby')}>
                         <Sword className="w-4 h-4" />
                         Challenge
                       </Button>
