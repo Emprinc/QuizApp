@@ -12,31 +12,34 @@ export function Landing() {
   const [recentGames, setRecentGames] = useState([])
 
   useEffect(() => {
-    if (user) {
-      // Fetch user stats
-      if (profile) {
-        setStats(prev => ({
-          ...prev,
-          gamesPlayed: profile.total_games || 0
-        }))
-      }
-
-      // Fetch recent games
-      supabase
-        .from('rooms')
-        .select(`
-          *,
-          players:room_players(count)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5)
-        .then(({ data }) => {
-          if (data) {
-            setRecentGames(data)
-          }
-        })
-        .catch(err => console.error('Error fetching recent games:', err))
+    // Fetch user-specific stats
+    if (user && profile) {
+      setStats(prev => ({
+        ...prev,
+        gamesPlayed: profile.total_games || 0
+      }))
+    } else {
+      setStats(prev => ({
+        ...prev,
+        gamesPlayed: 0
+      }))
     }
+
+    // Fetch recent games (now accessible to everyone)
+    supabase
+      .from('rooms')
+      .select(`
+        *,
+        players:room_players(count)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        if (data) {
+          setRecentGames(data)
+        }
+      })
+      .catch(err => console.error('Error fetching recent games:', err))
 
     // Fetch global stats (with error handling for unauthenticated requests)
     supabase
