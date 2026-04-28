@@ -426,6 +426,7 @@ export function GameProvider({ children }) {
       .from('player_answers')
       .insert([{
         player_id: user.id,
+        room_id: currentRoom.id,
         question_id: currentQuestion.id,
         answer: answerIndex,
         is_correct: isCorrect,

@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
 CREATE TABLE IF NOT EXISTS public.player_answers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   player_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  room_id UUID REFERENCES public.rooms(id) ON DELETE CASCADE,
   question_id UUID REFERENCES public.questions(id) ON DELETE SET NULL,
   answer INTEGER NOT NULL CHECK (answer BETWEEN 0 AND 3),
   is_correct BOOLEAN,

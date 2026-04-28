@@ -27,7 +27,8 @@ export function Room() {
 
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [showResults, setShowResults] = useState(false)
+  const [showReview, setShowReview] = useState(false)
+  const [reviewQuestions, setReviewQuestions] = useState([])
 
   useEffect(() => {
     if (!currentRoom || currentRoom.code !== code) {
@@ -128,10 +129,27 @@ export function Room() {
   const isHost = currentRoom.host_id === user?.id
   const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
 
+  const handleShowReview = async () => {
+    try {
+      const { data: answers } = await supabase
+        .from('player_answers')
+        .select('*, question:questions(*)')
+        .eq('room_id', currentRoom.id)
+        .eq('player_id', user.id)
+
+      if (answers) {
+        setReviewQuestions(answers)
+        setShowReview(true)
+      }
+    } catch (err) {
+      toast.error('Failed to load review')
+    }
+  }
+
   // Results screen
-  if (gameState === GAME_STATES.FINISHED || showResults) {
+  if (gameState === GAME_STATES.FINISHED) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4 pb-24 md:pb-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -177,16 +195,88 @@ export function Room() {
               ))}
             </div>
 
-            <div className="flex gap-3">
-              <Button variant="secondary" className="flex-1" onClick={handleLeave}>
-                <LogOut className="w-4 h-4" />
-                Leave Room
-              </Button>
-              <Button className="flex-1" onClick={handlePlayAgain}>
-                Play Again
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <Button variant="secondary" className="flex-1" onClick={handleLeave}>
+                  <LogOut className="w-4 h-4" />
+                  Leave Room
+                </Button>
+                <Button className="flex-1" onClick={handlePlayAgain}>
+                  Play Again
+                </Button>
+              </div>
+              <Button variant="ghost" className="w-full" onClick={handleShowReview}>
+                Review Questions
               </Button>
             </div>
           </Card>
+
+          {/* Review Modal/View */}
+          <AnimatePresence>
+            {showReview && (
+              <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="fixed inset-0 z-50 bg-background overflow-y-auto p-4 md:p-8"
+              >
+                <div className="max-w-3xl mx-auto">
+                  <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-2xl font-bold text-white">Review Questions</h2>
+                    <Button variant="ghost" onClick={() => setShowReview(false)}>Close</Button>
+                  </div>
+
+                  <div className="space-y-6 pb-20">
+                    {reviewQuestions.map((item, idx) => (
+                      <Card key={item.id} className="p-6">
+                        <div className="flex items-start gap-4 mb-4">
+                          <div className={`
+                            w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold
+                            ${item.is_correct ? 'bg-success text-white' : 'bg-danger text-white'}
+                          `}>
+                            {idx + 1}
+                          </div>
+                          <h3 className="text-lg font-bold text-white">{item.question?.question_text}</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                          {item.question?.options.map((opt, oIdx) => {
+                            const isCorrect = oIdx === item.question.correct_answer
+                            const isYourAnswer = oIdx === item.answer
+
+                            return (
+                              <div
+                                key={oIdx}
+                                className={`
+                                  p-3 rounded-lg border-2 text-sm
+                                  ${isCorrect ? 'bg-success/20 border-success text-white' :
+                                    isYourAnswer && !isCorrect ? 'bg-danger/20 border-danger text-white' :
+                                    'bg-surface-light border-transparent text-slate-400'}
+                                `}
+                              >
+                                {opt}
+                                {isCorrect && <span className="ml-2 text-xs font-bold">(Correct)</span>}
+                                {isYourAnswer && !isCorrect && <span className="ml-2 text-xs font-bold">(Your Answer)</span>}
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {item.question?.explanation && (
+                          <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
+                            <p className="text-sm text-slate-300">
+                              <span className="font-bold text-primary mr-2">Explanation:</span>
+                              {item.question.explanation}
+                            </p>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     )
