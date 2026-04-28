@@ -9,21 +9,35 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
+    // Check session and verify user still exists
+    const initAuth = async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+          setUser(authUser)
+          await fetchProfile(authUser.id)
+        } else {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err)
+        setUser(null)
+        setProfile(null)
         setLoading(false)
       }
-    })
+    }
+
+    initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user ?? null)
         if (session?.user) {
+          setUser(session.user)
           await fetchProfile(session.user.id)
         } else {
+          setUser(null)
           setProfile(null)
         }
         setLoading(false)
@@ -41,22 +55,40 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .single()
 
-      if (error && error.code === 'PGRST116') {
-        // Profile doesn't exist, create one
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert([{ id: userId, username: userId.slice(0, 8) }])
-          .select()
-          .single()
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, try to create one (fallback if trigger fails)
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([{ id: userId, username: userId.slice(0, 8) }])
+            .select()
+            .single()
 
-        if (!createError) {
-          setProfile(newProfile)
+          if (!createError) {
+            setProfile(newProfile)
+          } else {
+            console.error('Error creating profile fallback:', createError)
+            // If we can't fetch or create a profile, the user might be deleted from DB
+            await signOut()
+          }
+        } else {
+          console.error('Error fetching profile:', error)
+          // For other errors (like permission denied if user was deleted/banned in a way that blocks read)
+          if (error.status === 403 || error.status === 401) {
+            await signOut()
+          }
         }
-      } else if (!error) {
+      } else {
+        // Check for ban status
+        if (data.is_banned) {
+          console.warn('User is banned, signing out...')
+          await signOut()
+          return
+        }
         setProfile(data)
       }
     } catch (err) {
-      console.error('Error fetching profile:', err)
+      console.error('Unexpected error in fetchProfile:', err)
     } finally {
       setLoading(false)
     }
@@ -66,20 +98,17 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username: username || email.split('@')[0]
+        }
+      }
     })
 
     if (error) throw error
 
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: data.user.id,
-          username: username || email.split('@')[0]
-        }])
-
-      if (profileError) console.error('Profile creation error:', profileError)
-    }
+    // Note: Database trigger 'handle_new_user' creates the profile automatically.
+    // We don't need to manually insert it here anymore, which avoids RLS/conflict issues.
 
     return data
   }

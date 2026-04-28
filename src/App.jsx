@@ -22,7 +22,7 @@ import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
 
   if (loading) {
     return (
@@ -32,7 +32,8 @@ function ProtectedRoute({ children }) {
     )
   }
 
-  if (!user) {
+  // Require both auth user and profile for protected routes
+  if (!user || (user && !profile)) {
     return <Navigate to="/login" replace />
   }
 
