@@ -188,14 +188,19 @@ export function GameProvider({ children }) {
     }
 
     setCurrentRoom(room)
-    subscribeToRoom(room.id)
+    const channel = subscribeToRoom(room.id)
 
-    // Broadcast player joined
-    broadcastEvent(room.id, 'player_joined', {
-      playerId: user.id,
-      username: profile.username,
-      avatar_url: profile.avatar_url,
-      isHost: room.host_id === user.id
+    // Broadcast player joined using the channel directly to avoid race conditions
+    channel.send({
+      type: 'broadcast',
+      event: 'player_joined',
+      payload: {
+        playerId: user.id,
+        username: profile.username,
+        avatar_url: profile.avatar_url,
+        isHost: room.host_id === user.id,
+        timestamp: Date.now()
+      }
     })
 
     // Fetch existing players
@@ -376,15 +381,19 @@ export function GameProvider({ children }) {
     }
   }
 
-  const endGame = () => {
+  const endGame = async () => {
     setGameState(GAME_STATES.FINISHED)
     setCurrentQuestion(null)
 
     if (currentRoom) {
-      supabase
-        .from('rooms')
-        .update({ status: GAME_STATES.FINISHED })
-        .eq('id', currentRoom.id)
+      try {
+        await supabase
+          .from('rooms')
+          .update({ status: GAME_STATES.FINISHED })
+          .eq('id', currentRoom.id)
+      } catch (err) {
+        console.error('Error updating room status at end game:', err)
+      }
     }
 
     broadcastEvent(currentRoom.id, 'game_end', {
@@ -396,14 +405,18 @@ export function GameProvider({ children }) {
 
     // Update player stats
     if (user) {
-      const winner = players.reduce((a, b) => (a.score > b.score ? a : b))
-      const isWinner = winner?.id === user.id
+      try {
+        const winner = players.reduce((a, b) => (a.score > b.score ? a : b))
+        const isWinner = winner?.id === user.id
 
-      supabase.rpc('update_player_stats', {
-        p_user_id: user.id,
-        p_games: 1,
-        p_wins: isWinner ? 1 : 0
-      }).catch(() => {})
+        await supabase.rpc('update_player_stats', {
+          p_user_id: user.id,
+          p_games: 1,
+          p_wins: isWinner ? 1 : 0
+        })
+      } catch (err) {
+        console.error('Error updating player stats:', err)
+      }
     }
   }
 
