@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -6,15 +7,15 @@ import { Header, BottomNav } from './components/layout'
 import { LoadingSpinner } from './components/ui'
 
 // Pages
-import { Landing } from './pages/Landing'
-import { Login } from './pages/Login'
-import { Register } from './pages/Register'
-import { Lobby } from './pages/Lobby'
-import { Room } from './pages/Room'
-import { Leaderboard } from './pages/Leaderboard'
-import { Friends } from './pages/Friends'
-import { Profile } from './pages/Profile'
-import { Admin } from './pages/Admin'
+const Landing = lazy(() => import('./pages/Landing').then(module => ({ default: module.Landing })))
+const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })))
+const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })))
+const Lobby = lazy(() => import('./pages/Lobby').then(module => ({ default: module.Lobby })))
+const Room = lazy(() => import('./pages/Room').then(module => ({ default: module.Room })))
+const Leaderboard = lazy(() => import('./pages/Leaderboard').then(module => ({ default: module.Leaderboard })))
+const Friends = lazy(() => import('./pages/Friends').then(module => ({ default: module.Friends })))
+const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })))
+const Admin = lazy(() => import('./pages/Admin').then(module => ({ default: module.Admin })))
 
 // Components
 import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
@@ -45,56 +46,62 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background">
       {user && <Header />}
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/join/:code" element={
-          <ProtectedRoute>
-            <Lobby />
-          </ProtectedRoute>
-        } />
+      <Suspense fallback={
+        <div className="min-h-[80vh] flex items-center justify-center">
+          <LoadingSpinner size="lg" />
+        </div>
+      }>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/join/:code" element={
+            <ProtectedRoute>
+              <Lobby />
+            </ProtectedRoute>
+          } />
 
-        {/* Protected Routes */}
-        <Route path="/lobby" element={
-          <ProtectedRoute>
-            <Lobby />
-          </ProtectedRoute>
-        } />
-        <Route path="/room/:code" element={
-          <ProtectedRoute>
-            <Room />
-          </ProtectedRoute>
-        } />
-        <Route path="/leaderboard" element={
-          <ProtectedRoute>
-            <Leaderboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/friends" element={
-          <ProtectedRoute>
-            <Friends />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
+          {/* Protected Routes */}
+          <Route path="/lobby" element={
+            <ProtectedRoute>
+              <Lobby />
+            </ProtectedRoute>
+          } />
+          <Route path="/room/:code" element={
+            <ProtectedRoute>
+              <Room />
+            </ProtectedRoute>
+          } />
+          <Route path="/leaderboard" element={
+            <ProtectedRoute>
+              <Leaderboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/friends" element={
+            <ProtectedRoute>
+              <Friends />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
 
-        {/* Admin Routes */}
-        <Route path="/admin/*" element={
-          <ProtectedRoute>
-            <ProtectedAdminRoute>
-              <Admin />
-            </ProtectedAdminRoute>
-          </ProtectedRoute>
-        } />
+          {/* Admin Routes */}
+          <Route path="/admin/*" element={
+            <ProtectedRoute>
+              <ProtectedAdminRoute>
+                <Admin />
+              </ProtectedAdminRoute>
+            </ProtectedRoute>
+          } />
 
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
       {user && <BottomNav />}
     </div>
   )
