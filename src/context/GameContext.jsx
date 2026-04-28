@@ -432,7 +432,7 @@ export function GameProvider({ children }) {
             id: rp.player_id,
             username: rp.player?.username || 'Unknown',
             avatar_url: rp.player?.avatar_url,
-            isHost: rp.player_id === currentRoom.host_id,
+            isHost: rp.room_id === currentRoom.host_id,
             score: rp.score
           }))
           setPlayers(mappedPlayers)
