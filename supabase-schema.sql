@@ -157,7 +157,7 @@ CREATE POLICY "Users can update own profile"
 
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
+  WITH CHECK (auth.uid() = id AND is_admin = false);
 
 -- Questions policies (read-only for everyone)
 CREATE POLICY "Questions are viewable by everyone"
