@@ -98,8 +98,9 @@ export function GameProvider({ children }) {
         ))
       })
       .on('broadcast', { event: 'round_end' }, ({ payload }) => {
-        setCurrentQuestion(null)
+        // We keep the current question visible so the reveal can be shown in BattleView
         setTimeout(() => {
+          setCurrentQuestion(null)
           if (!payload.isLast) {
             broadcastEvent(roomId, 'next_round', { round: payload.nextRound })
           }
@@ -119,6 +120,13 @@ export function GameProvider({ children }) {
             score: payload.finalScores[p.id] !== undefined ? payload.finalScores[p.id] : p.score
           })))
         }
+      })
+      .on('broadcast', { event: 'rematch' }, () => {
+        setGameState(GAME_STATES.WAITING)
+        setCurrentRound(0)
+        setCurrentQuestion(null)
+        setPlayers(prev => prev.map(p => ({ ...p, score: 0, answers_correct: 0 })))
+        toast('Rematch starting soon!', { icon: '🎮' })
       })
       .subscribe()
 
@@ -243,9 +251,32 @@ export function GameProvider({ children }) {
         id: rp.player_id,
         username: rp.player?.username || 'Unknown',
         avatar_url: rp.player?.avatar_url,
-        isHost: rp.room_id === room.host_id,
-        score: rp.score
+        isHost: rp.player_id === room.host_id,
+        score: rp.score || 0,
+        answers_correct: rp.answers_correct || 0
       })))
+    }
+
+    // Recovery logic if game is already in progress
+    if (room.status === GAME_STATES.PLAYING) {
+      setGameState(GAME_STATES.PLAYING)
+      setCurrentRound(room.current_round || 1)
+
+      // Fetch session questions to ensure consistency
+      const { data: sessionQuestions } = await supabase
+        .from('game_sessions')
+        .select('*, question:questions(*)')
+        .eq('room_id', room.id)
+        .order('round_number', { ascending: true })
+
+      if (sessionQuestions && sessionQuestions.length > 0) {
+        const questions = sessionQuestions.map(sq => sq.question)
+        questionsRef.current = questions
+        const roundIdx = (room.current_round || 1) - 1
+        if (questions[roundIdx]) {
+          setCurrentQuestion(questions[roundIdx])
+        }
+      }
     }
 
     return room
@@ -278,25 +309,43 @@ export function GameProvider({ children }) {
   const startGame = async () => {
     if (!currentRoom || !user) return
 
-    // Fetch questions
+    // Fetch a larger pool of questions for better randomization
     const { data: questions } = await supabase
       .from('questions')
       .select('*')
       .eq('category', currentRoom.category)
-      .order('created_at', { ascending: false })
-      .limit(currentRoom.question_count)
+      .limit(50)
 
     if (!questions || questions.length === 0) {
       throw new Error('No questions available for this category')
     }
 
-    if (questions.length < currentRoom.question_count) {
-      toast.error(`Only ${questions.length} questions available in this category.`)
+    // Local Fisher-Yates shuffle for better randomness than Array.sort()
+    const shuffle = (array) => {
+      const newArray = [...array]
+      for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]]
+      }
+      return newArray
     }
 
-    // Shuffle and store questions
-    const shuffled = [...questions].sort(() => Math.random() - 0.5)
-    questionsRef.current = shuffled.slice(0, currentRoom.question_count)
+    const shuffled = shuffle(questions)
+    const selectedQuestions = shuffled.slice(0, Math.min(questions.length, currentRoom.question_count))
+    questionsRef.current = selectedQuestions
+
+    if (questionsRef.current.length < currentRoom.question_count) {
+      toast.error(`Only ${questionsRef.current.length} questions available in this category.`)
+    }
+
+    // Persist questions to game_sessions for sync
+    const sessionInserts = selectedQuestions.map((q, idx) => ({
+      room_id: currentRoom.id,
+      question_id: q.id,
+      round_number: idx + 1
+    }))
+
+    await supabase.from('game_sessions').insert(sessionInserts)
 
     // Update room status
     await supabase
@@ -315,10 +364,18 @@ export function GameProvider({ children }) {
     }, 2000)
   }
 
-  const startRound = (roundNumber) => {
+  const startRound = async (roundNumber) => {
     if (roundNumber > questionsRef.current.length) {
       endGame()
       return
+    }
+
+    // Update current round in database for refresh resilience
+    if (currentRoom) {
+      await supabase
+        .from('rooms')
+        .update({ current_round: roundNumber })
+        .eq('id', currentRoom.id)
     }
 
     const question = questionsRef.current[roundNumber - 1]
@@ -340,8 +397,11 @@ export function GameProvider({ children }) {
     setCurrentRound(roundNumber)
     setGameState(GAME_STATES.PLAYING)
 
+    // Omit the correct answer from the broadcast to prevent client-side cheating
+    const { correctAnswer, shuffledCorrectIndex, ...safeQuestion } = displayQuestion
+
     broadcastEvent(currentRoom.id, 'question', {
-      question: displayQuestion,
+      question: safeQuestion,
       round: roundNumber
     })
 
@@ -366,6 +426,7 @@ export function GameProvider({ children }) {
       .from('player_answers')
       .insert([{
         player_id: user.id,
+        room_id: currentRoom.id,
         question_id: currentQuestion.id,
         answer: answerIndex,
         is_correct: isCorrect,
@@ -374,6 +435,19 @@ export function GameProvider({ children }) {
       }])
 
     if (error) console.error('Error recording answer:', error)
+
+    // Update room_players score for persistence across refreshes
+    const currentPlayer = players.find(p => p.id === user.id)
+    const newScore = (currentPlayer?.score || 0) + pointsEarned
+
+    await supabase
+      .from('room_players')
+      .update({
+        score: newScore,
+        answers_correct: isCorrect ? (currentPlayer?.answers_correct || 0) + 1 : (currentPlayer?.answers_correct || 0)
+      })
+      .eq('room_id', currentRoom.id)
+      .eq('player_id', user.id)
 
     setAnswers(prev => ({
       ...prev,
@@ -395,10 +469,13 @@ export function GameProvider({ children }) {
     }
 
     const isLast = roundNumber >= questionsRef.current.length
+    const currentQ = questionsRef.current[roundNumber - 1]
 
     broadcastEvent(currentRoom.id, 'round_end', {
       isLast,
-      nextRound: roundNumber + 1
+      nextRound: roundNumber + 1,
+      correctAnswerIndex: currentQuestion?.correctAnswer, // Send the correct index now that round is over
+      originalCorrectAnswer: currentQ?.correct_answer
     })
 
     if (!isLast) {
@@ -483,6 +560,7 @@ export function GameProvider({ children }) {
       gameState,
       answers,
       scores,
+      roomChannel,
       createRoom,
       joinRoom,
       leaveRoom,
