@@ -385,32 +385,43 @@ export function GameProvider({ children }) {
   }
 
   const startRound = async (roundNumber) => {
-    if (roundNumber > questionsRef.current.length) {
+    if (!questionsRef.current || roundNumber > questionsRef.current.length) {
       endGame()
       return
     }
 
     // Update current round in database for refresh resilience
     if (currentRoom) {
-      await supabase
-        .from('rooms')
-        .update({ current_round: roundNumber })
-        .eq('id', currentRoom.id)
+      try {
+        await supabase
+          .from('rooms')
+          .update({ current_round: roundNumber })
+          .eq('id', currentRoom.id)
+      } catch (err) {
+        console.warn('Error updating round in DB:', err.message)
+      }
     }
 
     const question = questionsRef.current[roundNumber - 1]
-    const shuffledOptions = [...question.options]
-    const correctIndex = question.correct_answer
+    if (!question) {
+      endGame()
+      return
+    }
 
-    // Shuffle options for this round
+    // Correctly handle shuffle and mapping
+    const originalOptions = [...question.options]
     const shuffledIndices = [0, 1, 2, 3].sort(() => Math.random() - 0.5)
-    const remappedCorrect = shuffledIndices.indexOf(correctIndex)
+
+    // Create new options array based on shuffled indices
+    const shuffledOptions = shuffledIndices.map(i => originalOptions[i])
+
+    // Find where the original correct answer ended up
+    const remappedCorrect = shuffledIndices.indexOf(question.correct_answer)
 
     const displayQuestion = {
       ...question,
-      options: shuffledIndices.map(i => question.options[i]),
-      correctAnswer: remappedCorrect,
-      shuffledCorrectIndex: correctIndex
+      options: shuffledOptions,
+      correctAnswer: remappedCorrect
     }
 
     setCurrentQuestion(displayQuestion)
@@ -418,7 +429,7 @@ export function GameProvider({ children }) {
     setGameState(GAME_STATES.PLAYING)
 
     // Omit the correct answer from the broadcast to prevent client-side cheating
-    const { correctAnswer, shuffledCorrectIndex, ...safeQuestion } = displayQuestion
+    const { correctAnswer, ...safeQuestion } = displayQuestion
 
     broadcastEvent(currentRoom.id, 'question', {
       question: safeQuestion,
@@ -426,6 +437,7 @@ export function GameProvider({ children }) {
     })
 
     // Set timer for round end
+    if (roundTimerRef.current) clearTimeout(roundTimerRef.current)
     roundTimerRef.current = setTimeout(() => {
       endRound(roundNumber)
     }, (currentRoom.time_per_question || 15) * 1000)

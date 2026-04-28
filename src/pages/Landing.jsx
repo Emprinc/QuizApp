@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react'
 
 export function Landing() {
   const { user, profile } = useAuth()
-  const [stats, setStats] = useState({ gamesPlayed: 0, totalPlayers: 0, questionsAnswered: 0 })
+  const [stats, setStats] = useState({ gamesPlayed: 0, totalPlayers: 0, questionsAnswered: 0, onlinePlayers: 0 })
   const [recentGames, setRecentGames] = useState([])
 
   useEffect(() => {
@@ -63,6 +63,17 @@ export function Landing() {
 
         if (!questionError && questionCount !== null) {
           setStats(prev => ({ ...prev, questionsAnswered: questionCount }))
+        }
+
+        // Online players (last seen in last 5 minutes)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        const { count: onlineCount, error: onlineError } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .gt('last_seen', fiveMinutesAgo)
+
+        if (!onlineError && onlineCount !== null) {
+          setStats(prev => ({ ...prev, onlinePlayers: onlineCount }))
         }
       } catch (err) {
         console.warn('Error fetching global stats:', err.message)
@@ -159,10 +170,11 @@ export function Landing() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="grid grid-cols-3 gap-4 md:gap-8 max-w-2xl mx-auto mt-16"
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 max-w-4xl mx-auto mt-16"
           >
             {[
               { value: stats.totalPlayers.toLocaleString(), label: 'Players' },
+              { value: stats.onlinePlayers.toLocaleString(), label: 'Online' },
               { value: stats.questionsAnswered.toLocaleString(), label: 'Questions' },
               { value: stats.gamesPlayed.toLocaleString(), label: 'Games Played' }
             ].map((stat, i) => (

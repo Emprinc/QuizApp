@@ -10,6 +10,8 @@ import { LoadingSpinner } from './components/ui'
 const Landing = lazy(() => import('./pages/Landing').then(module => ({ default: module.Landing })))
 const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })))
 const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then(module => ({ default: module.ForgotPassword })))
+const ResetPassword = lazy(() => import('./pages/ResetPassword').then(module => ({ default: module.ResetPassword })))
 const Lobby = lazy(() => import('./pages/Lobby').then(module => ({ default: module.Lobby })))
 const Room = lazy(() => import('./pages/Room').then(module => ({ default: module.Room })))
 const Leaderboard = lazy(() => import('./pages/Leaderboard').then(module => ({ default: module.Leaderboard })))
@@ -57,6 +59,8 @@ function AppContent() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/join/:code" element={
             <ProtectedRoute>
               <Room />

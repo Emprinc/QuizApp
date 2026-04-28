@@ -187,7 +187,7 @@ export function Room() {
                   >
                     {index + 1}
                   </div>
-                  <Avatar username={player.username} size="sm" />
+                  <Avatar username={player.username} avatarUrl={player.avatar_url} size="sm" />
                   <div className="flex-1 text-left">
                     <div className="font-medium text-white">
                       {player.username}
@@ -392,7 +392,7 @@ export function Room() {
                 transition={{ delay: index * 0.05 }}
                 className="flex items-center gap-3 p-3 rounded-xl bg-surface-light"
               >
-                <Avatar username={player.username} size="md" />
+                <Avatar username={player.username} avatarUrl={player.avatar_url} size="md" />
                 <div className="flex-1">
                   <div className="font-medium text-white">
                     {player.username}
@@ -657,7 +657,7 @@ function BattleView() {
                 >
                   {index + 1}
                 </div>
-                <Avatar username={player.username} size="sm" />
+                <Avatar username={player.username} avatarUrl={player.avatar_url} size="sm" />
                 <div className="flex-1 text-sm font-medium text-white">
                   {player.username}
                   {player.id === user?.id && ' (You)'}

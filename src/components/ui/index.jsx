@@ -99,7 +99,7 @@ export function Card({ children, className = '', hover = false, onClick }) {
   )
 }
 
-export function Avatar({ username, size = 'md', showStatus = false, status = 'offline' }) {
+export function Avatar({ username, avatarUrl, size = 'md', showStatus = false, status = 'offline' }) {
   const sizes = {
     sm: 'w-8 h-8 text-xs',
     md: 'w-10 h-10 text-sm',
@@ -132,12 +132,20 @@ export function Avatar({ username, size = 'md', showStatus = false, status = 'of
 
   return (
     <div className="relative">
-      <div
-        className={`${sizes[size]} rounded-full flex items-center justify-center font-bold text-white`}
-        style={{ background: getGradient(username) }}
-      >
-        {getInitials(username)}
-      </div>
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={username}
+          className={`${sizes[size]} rounded-full object-cover`}
+        />
+      ) : (
+        <div
+          className={`${sizes[size]} rounded-full flex items-center justify-center font-bold text-white`}
+          style={{ background: getGradient(username) }}
+        >
+          {getInitials(username)}
+        </div>
+      )}
       {showStatus && (
         <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-surface ${statusColors[status]}`} />
       )}

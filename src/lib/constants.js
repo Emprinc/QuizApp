@@ -1,10 +1,8 @@
 export const CATEGORIES = [
-  { id: 'general', name: 'General Knowledge', icon: 'Lightbulb', color: '#F59E0B' },
   { id: 'science', name: 'Science', icon: 'Beaker', color: '#10B981' },
-  { id: 'history', name: 'History', icon: 'Clock', color: '#6366F1' },
-  { id: 'sports', name: 'Sports', icon: 'Trophy', color: '#EC4899' },
-  { id: 'entertainment', name: 'Entertainment', icon: 'Film', color: '#8B5CF6' },
-  { id: 'tech', name: 'Technology', icon: 'Cpu', color: '#06B6D4' }
+  { id: 'tech', name: 'Technology', icon: 'Cpu', color: '#06B6D4' },
+  { id: 'engineering', name: 'Engineering', icon: 'Wrench', color: '#F59E0B' },
+  { id: 'math', name: 'Mathematics', icon: 'PlusSquare', color: '#6366F1' }
 ]
 
 export const DIFFICULTIES = ['easy', 'medium', 'hard']

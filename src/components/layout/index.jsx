@@ -60,7 +60,7 @@ export function Header() {
                   to="/profile"
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
                 >
-                  <Avatar username={profile?.username} size="sm" />
+                  <Avatar username={profile?.username} avatarUrl={profile?.avatar_url} size="sm" />
                   <span className="hidden sm:block text-sm font-medium text-slate-300">
                     {profile?.username}
                   </span>
