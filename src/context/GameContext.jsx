@@ -111,6 +111,14 @@ export function GameProvider({ children }) {
         if (roundTimerRef.current) {
           clearTimeout(roundTimerRef.current)
         }
+
+        // Synchronize final scores from broadcast
+        if (payload.finalScores) {
+          setPlayers(prev => prev.map(p => ({
+            ...p,
+            score: payload.finalScores[p.id] !== undefined ? payload.finalScores[p.id] : p.score
+          })))
+        }
       })
       .subscribe()
 
@@ -444,13 +452,15 @@ export function GameProvider({ children }) {
     // Update player stats
     if (user) {
       try {
+        const myPlayer = players.find(p => p.id === user.id)
         const winner = players.reduce((a, b) => (a.score > b.score ? a : b))
         const isWinner = winner?.id === user.id
 
         await supabase.rpc('update_player_stats', {
           p_user_id: user.id,
           p_games: 1,
-          p_wins: isWinner ? 1 : 0
+          p_wins: isWinner ? 1 : 0,
+          p_score: myPlayer?.score || 0
         })
       } catch (err) {
         console.error('Error updating player stats:', err)

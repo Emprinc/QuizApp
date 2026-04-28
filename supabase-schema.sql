@@ -104,11 +104,28 @@ CREATE OR REPLACE FUNCTION public.update_player_stats(
 BEGIN
   UPDATE public.profiles
   SET
-    total_games = total_games + p_games,
-    total_wins = total_wins + p_wins,
-    total_score = total_score + p_score,
+    total_games = total_games + COALESCE(p_games, 0),
+    total_wins = total_wins + COALESCE(p_wins, 0),
+    total_score = total_score + COALESCE(p_score, 0),
     updated_at = NOW()
   WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user global rank
+CREATE OR REPLACE FUNCTION public.get_user_rank(p_user_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+    user_rank INTEGER;
+BEGIN
+    SELECT rank INTO user_rank
+    FROM (
+        SELECT id, RANK() OVER (ORDER BY total_score DESC) as rank
+        FROM public.profiles
+    ) sub
+    WHERE id = p_user_id;
+
+    RETURN user_rank;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
