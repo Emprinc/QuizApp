@@ -186,6 +186,10 @@ CREATE POLICY "Hosts can update room status"
   ON public.rooms FOR UPDATE
   USING (auth.uid() = host_id);
 
+CREATE POLICY "Hosts can delete rooms"
+  ON public.rooms FOR DELETE
+  USING (auth.uid() = host_id);
+
 -- Room players policies
 CREATE POLICY "Room players are viewable by everyone"
   ON public.room_players FOR SELECT
@@ -198,6 +202,10 @@ CREATE POLICY "Authenticated users can join rooms"
 
 CREATE POLICY "Players can update own score"
   ON public.room_players FOR UPDATE
+  USING (auth.uid() = player_id);
+
+CREATE POLICY "Players can leave rooms"
+  ON public.room_players FOR DELETE
   USING (auth.uid() = player_id);
 
 -- Player answers policies

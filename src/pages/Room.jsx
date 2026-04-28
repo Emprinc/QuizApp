@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Copy, Check, Users, Zap, Clock, Play, LogOut, Trophy } from 'lucide-react'
@@ -279,11 +279,12 @@ function BattleView() {
   const [timeLeft, setTimeLeft] = useState(currentRoom?.time_per_question || 15)
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
   const [scoreGained, setScoreGained] = useState(0)
-  const startTimeRef = useState(Date.now())[0]
+  const startTimeRef = useRef(Date.now())
 
   useEffect(() => {
     if (!currentQuestion) return
 
+    startTimeRef.current = Date.now()
     setTimeLeft(currentRoom?.time_per_question || 15)
     setSelectedAnswer(null)
     setIsAnswerRevealed(false)
@@ -305,7 +306,7 @@ function BattleView() {
   const handleAnswer = async (index) => {
     if (selectedAnswer !== null || isAnswerRevealed) return
 
-    const timeTaken = Date.now() - startTimeRef
+    const timeTaken = Date.now() - startTimeRef.current
     setSelectedAnswer(index)
 
     await submitAnswer(index, timeTaken)
@@ -317,7 +318,7 @@ function BattleView() {
       setIsAnswerRevealed(true)
       const myAnswer = selectedAnswer === currentQuestion?.correctAnswer
       if (myAnswer) {
-        const timeBonus = Math.max(0, 100 - Math.floor((Date.now() - startTimeRef) / 1000 * 8))
+        const timeBonus = Math.max(0, 100 - Math.floor((Date.now() - startTimeRef.current) / 1000 * 8))
         setScoreGained(100 + timeBonus)
       }
     }

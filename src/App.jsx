@@ -59,7 +59,7 @@ function AppContent() {
           <Route path="/register" element={<Register />} />
           <Route path="/join/:code" element={
             <ProtectedRoute>
-              <Lobby />
+              <Room />
             </ProtectedRoute>
           } />
 
