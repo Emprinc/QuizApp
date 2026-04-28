@@ -58,6 +58,44 @@ export function Room() {
     navigate('/lobby')
   }
 
+  const handlePlayAgain = async () => {
+    if (isHost) {
+      try {
+        // Reset room status and round in DB
+        await supabase
+          .from('rooms')
+          .update({
+            status: GAME_STATES.WAITING,
+            current_round: 0
+          })
+          .eq('id', currentRoom.id)
+
+        // Reset player scores in DB
+        await supabase
+          .from('room_players')
+          .update({
+            score: 0,
+            answers_correct: 0
+          })
+          .eq('room_id', currentRoom.id)
+
+        // Broadcast rematch to all players
+        if (roomChannel) {
+          roomChannel.send({
+            type: 'broadcast',
+            event: 'rematch',
+            payload: {}
+          })
+        }
+      } catch (err) {
+        toast.error('Failed to reset game')
+      }
+    } else {
+      // Non-hosts just go back to lobby or wait for rematch broadcast
+      handleLeave()
+    }
+  }
+
   const handleStart = async () => {
     try {
       await startGame()
@@ -144,7 +182,7 @@ export function Room() {
                 <LogOut className="w-4 h-4" />
                 Leave Room
               </Button>
-              <Button className="flex-1" onClick={handleLeave}>
+              <Button className="flex-1" onClick={handlePlayAgain}>
                 Play Again
               </Button>
             </div>
@@ -274,7 +312,7 @@ export function Room() {
 // Battle View Component
 function BattleView() {
   const { user } = useAuth()
-  const { currentRoom, players, currentQuestion, currentRound, submitAnswer, gameState } = useGame()
+  const { currentRoom, players, currentQuestion, currentRound, submitAnswer, gameState, roomChannel } = useGame()
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [timeLeft, setTimeLeft] = useState(currentRoom?.time_per_question || 15)
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
@@ -313,16 +351,33 @@ function BattleView() {
   }
 
   useEffect(() => {
-    // Check if answer is revealed
-    if (selectedAnswer !== null) {
+    if (!roomChannel) return
+
+    const handleRoundEnd = ({ payload }) => {
       setIsAnswerRevealed(true)
-      const myAnswer = selectedAnswer === currentQuestion?.correctAnswer
-      if (myAnswer) {
-        const timeBonus = Math.max(0, 100 - Math.floor((Date.now() - startTimeRef.current) / 1000 * 8))
-        setScoreGained(100 + timeBonus)
+
+      // If we didn't have the correct answer locally (security), use the one from broadcast
+      if (currentQuestion && payload.correctAnswerIndex !== undefined) {
+        currentQuestion.correctAnswer = payload.correctAnswerIndex
+      }
+
+      if (selectedAnswer !== null) {
+        const isCorrect = selectedAnswer === payload.correctAnswerIndex
+        if (isCorrect) {
+          // Show that they got it right; specific score was already handled in DB/context
+          setScoreGained(100)
+        }
       }
     }
-  }, [selectedAnswer, currentQuestion])
+
+    roomChannel.on('broadcast', { event: 'round_end' }, handleRoundEnd)
+
+    return () => {
+      if (roomChannel) {
+        roomChannel.unsubscribe()
+      }
+    }
+  }, [roomChannel, selectedAnswer, currentQuestion])
 
   const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
   const userRank = sortedPlayers.findIndex(p => p.id === user?.id) + 1
@@ -353,7 +408,7 @@ function BattleView() {
           className={`h-full ${timerColor}`}
           initial={{ width: '100%' }}
           animate={{ width: `${(timeLeft / (currentRoom?.time_per_question || 15)) * 100}%` }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 1, ease: "linear" }}
         />
       </div>
 

@@ -98,18 +98,30 @@ export const adminUserUtils = {
   },
 
   async getUserStats(userId) {
-    const { data, error } = await supabase
+    // Separate queries for better reliability and avoiding complex joins
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select(`
-        *,
-        room_players(count),
-        player_answers(count)
-      `)
+      .select('*')
       .eq('id', userId)
       .single()
     
-    if (error) throw error
-    return data
+    if (profileError) throw profileError
+
+    const { count: roomsCount } = await supabase
+      .from('room_players')
+      .select('*', { count: 'exact', head: true })
+      .eq('player_id', userId)
+
+    const { count: answersCount } = await supabase
+      .from('player_answers')
+      .select('*', { count: 'exact', head: true })
+      .eq('player_id', userId)
+
+    return {
+      ...profile,
+      rooms_count: roomsCount || 0,
+      answers_count: answersCount || 0
+    }
   },
 
   async updateUserAdmin(userId, isAdmin) {
