@@ -6,13 +6,18 @@ const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1N
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 async function checkData() {
-  const { count: profileCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
-  const { count: questionCount } = await supabase.from('questions').select('*', { count: 'exact', head: true })
-  const { data: rooms } = await supabase.from('rooms').select('*').limit(5)
+  const { count: profileCount, error: profileError } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
+  const { count: questionCount, error: questionError } = await supabase.from('questions').select('*', { count: 'exact', head: true })
+  const { data: rooms, error: roomsError } = await supabase.from('rooms').select('*').limit(5)
 
-  console.log('Profile count:', profileCount)
-  console.log('Question count:', questionCount)
-  console.log('Rooms:', rooms)
+  if (profileError) console.error('Profile error:', profileError)
+  else console.log('Profile count:', profileCount)
+
+  if (questionError) console.error('Question error:', questionError)
+  else console.log('Question count:', questionCount)
+
+  if (roomsError) console.error('Rooms error:', roomsError)
+  else console.log('Rooms:', rooms)
 }
 
 checkData()

@@ -134,8 +134,14 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================
--- ROW LEVEL SECURITY
+-- ROW LEVEL SECURITY & PERMISSIONS
 -- ============================================
+
+-- Grant basic access to all users (needed for RLS to work correctly)
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 -- Enable RLS on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -146,8 +152,9 @@ ALTER TABLE public.player_answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
-CREATE POLICY "Public profiles are viewable by authenticated users"
+CREATE POLICY "Public profiles are viewable by everyone"
   ON public.profiles FOR SELECT
+  TO anon, authenticated
   USING (true);
 
 CREATE POLICY "Users can update own profile"
@@ -162,11 +169,13 @@ CREATE POLICY "Users can insert own profile"
 -- Questions policies (read-only for everyone)
 CREATE POLICY "Questions are viewable by everyone"
   ON public.questions FOR SELECT
+  TO anon, authenticated
   USING (true);
 
 -- Rooms policies
 CREATE POLICY "Rooms are viewable by everyone"
   ON public.rooms FOR SELECT
+  TO anon, authenticated
   USING (true);
 
 CREATE POLICY "Authenticated users can create rooms"
@@ -180,6 +189,7 @@ CREATE POLICY "Hosts can update room status"
 -- Room players policies
 CREATE POLICY "Room players are viewable by everyone"
   ON public.room_players FOR SELECT
+  TO anon, authenticated
   USING (true);
 
 CREATE POLICY "Authenticated users can join rooms"
