@@ -119,12 +119,28 @@ export function GameProvider({ children }) {
             ...p,
             score: payload.finalScores[p.id] !== undefined ? payload.finalScores[p.id] : p.score
           })))
+
+          // Update stats for non-host players who receive this broadcast
+          if (user) {
+            const myScore = payload.finalScores[user.id] || 0
+            const scoresArray = Object.values(payload.finalScores)
+            const maxScore = Math.max(...scoresArray, 0)
+            const isWinner = myScore === maxScore && myScore > 0
+
+            supabase.rpc('update_player_stats', {
+              p_user_id: user.id,
+              p_games: 1,
+              p_wins: isWinner ? 1 : 0,
+              p_score: myScore
+            }).catch(err => console.error('Error updating player stats:', err))
+          }
         }
       })
       .on('broadcast', { event: 'rematch' }, () => {
         setGameState(GAME_STATES.WAITING)
         setCurrentRound(0)
         setCurrentQuestion(null)
+        setCurrentRoom(prev => prev ? { ...prev, status: GAME_STATES.WAITING } : null)
         setPlayers(prev => prev.map(p => ({ ...p, score: 0, answers_correct: 0 })))
         toast('Rematch starting soon!', { icon: '🎮' })
       })
@@ -286,11 +302,15 @@ export function GameProvider({ children }) {
     if (currentRoom && user) {
       broadcastEvent(currentRoom.id, 'player_left', { playerId: user.id })
 
-      await supabase
-        .from('room_players')
-        .delete()
-        .eq('room_id', currentRoom.id)
-        .eq('player_id', user.id)
+      // Only delete from room_players if game hasn't started
+      // This preserves history for finished games
+      if (currentRoom.status === GAME_STATES.WAITING) {
+        await supabase
+          .from('room_players')
+          .delete()
+          .eq('room_id', currentRoom.id)
+          .eq('player_id', user.id)
+      }
 
       if (roomChannel) {
         roomChannel.unsubscribe()
@@ -498,6 +518,9 @@ export function GameProvider({ children }) {
           .update({ status: GAME_STATES.FINISHED })
           .eq('id', currentRoom.id)
 
+        // Update currentRoom status locally for leaveRoom logic
+        setCurrentRoom(prev => prev ? { ...prev, status: GAME_STATES.FINISHED } : null)
+
         // Fetch final scores to ensure synchronization
         const { data: finalPlayers } = await supabase
           .from('room_players')
@@ -514,33 +537,30 @@ export function GameProvider({ children }) {
           }))
           setPlayers(mappedPlayers)
 
-          broadcastEvent(currentRoom.id, 'game_end', {
-            finalScores: mappedPlayers.reduce((acc, p) => {
-              acc[p.id] = p.score
-              return acc
-            }, {})
-          })
+          const finalScores = mappedPlayers.reduce((acc, p) => {
+            acc[p.id] = p.score
+            return acc
+          }, {})
+
+          broadcastEvent(currentRoom.id, 'game_end', { finalScores })
+
+          // Host also updates their stats here since they don't receive their own broadcast
+          if (user) {
+            const myScore = finalScores[user.id] || 0
+            const scoresArray = Object.values(finalScores)
+            const maxScore = Math.max(...scoresArray, 0)
+            const isWinner = myScore === maxScore && myScore > 0
+
+            await supabase.rpc('update_player_stats', {
+              p_user_id: user.id,
+              p_games: 1,
+              p_wins: isWinner ? 1 : 0,
+              p_score: myScore
+            })
+          }
         }
       } catch (err) {
         console.error('Error updating room status at end game:', err)
-      }
-    }
-
-    // Update player stats
-    if (user) {
-      try {
-        const myPlayer = players.find(p => p.id === user.id)
-        const winner = players.reduce((a, b) => (a.score > b.score ? a : b))
-        const isWinner = winner?.id === user.id
-
-        await supabase.rpc('update_player_stats', {
-          p_user_id: user.id,
-          p_games: 1,
-          p_wins: isWinner ? 1 : 0,
-          p_score: myPlayer?.score || 0
-        })
-      } catch (err) {
-        console.error('Error updating player stats:', err)
       }
     }
   }
