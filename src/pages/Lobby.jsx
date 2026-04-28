@@ -53,7 +53,7 @@ export function Lobby() {
       .from('rooms')
       .select(`
         *,
-        host:profiles!rooms_host_id_fkey(username),
+        host:profiles!rooms_host_id_fkey(username, avatar_url),
         players:room_players(count)
       `)
       .eq('status', 'waiting')
@@ -194,9 +194,12 @@ export function Lobby() {
 
                   <div className="relative">
                     <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-bold text-white">{room.category}</h3>
-                        <p className="text-sm text-slate-400">Host: {room.host?.username || 'Unknown'}</p>
+                      <div className="flex items-center gap-3">
+                        <Avatar username={room.host?.username} avatarUrl={room.host?.avatar_url} size="sm" />
+                        <div>
+                          <h3 className="font-bold text-white capitalize">{room.category}</h3>
+                          <p className="text-sm text-slate-400">Host: {room.host?.username || 'Unknown'}</p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-black text-gradient">

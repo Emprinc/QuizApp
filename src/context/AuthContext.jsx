@@ -170,6 +170,33 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  const signInWithGoogle = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/lobby'
+      }
+    })
+    if (error) throw error
+    return data
+  }
+
+  const resetPassword = async (email) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password',
+    })
+    if (error) throw error
+    return data
+  }
+
+  const updatePassword = async (newPassword) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    })
+    if (error) throw error
+    return data
+  }
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut({ scope: 'global' })
@@ -189,7 +216,7 @@ export function AuthProvider({ children }) {
 
     const { data, error } = await supabase
       .from('profiles')
-      .update(updates)
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', user.id)
       .select()
       .single()
@@ -199,6 +226,26 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  const updateLastSeen = async () => {
+    if (!user) return
+    try {
+      await supabase
+        .from('profiles')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('id', user.id)
+    } catch (err) {
+      console.warn('Error updating last_seen:', err.message)
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      updateLastSeen()
+      const interval = setInterval(updateLastSeen, 2 * 60 * 1000) // Every 2 minutes
+      return () => clearInterval(interval)
+    }
+  }, [user])
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -206,6 +253,9 @@ export function AuthProvider({ children }) {
       loading,
       signUp,
       signIn,
+      signInWithGoogle,
+      resetPassword,
+      updatePassword,
       signOut,
       updateProfile
     }}>

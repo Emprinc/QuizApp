@@ -165,7 +165,7 @@ export function Profile() {
             className="text-center"
           >
             <div className="relative inline-block mb-6">
-              <Avatar username={profile?.username} size="xl" />
+              <Avatar username={profile?.username} avatarUrl={profile?.avatar_url} size="xl" />
               {editing && (
                 <label className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-primary flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors">
                   <Edit2 className="w-5 h-5 text-white" />
@@ -177,17 +177,25 @@ export function Profile() {
                       const file = e.target.files?.[0]
                       if (!file) return
 
-                      const formData = new FormData()
-                      formData.append('file', file)
-                      formData.append('upload_preset', 'quiz-battle')
+                      if (file.size > 2 * 1024 * 1024) {
+                        toast.error('Image size must be less than 2MB')
+                        return
+                      }
 
-                      const res = await fetch('https://api.cloudinary.com/v1_1/demo/image/upload', {
-                        method: 'POST',
-                        body: formData
-                      }).catch(() => null)
-
-                      // For demo, just show success
-                      toast.success('Avatar updated!')
+                      const reader = new FileReader()
+                      reader.onloadend = async () => {
+                        try {
+                          setSaving(true)
+                          const dataUrl = reader.result
+                          await updateProfile({ avatar_url: dataUrl })
+                          toast.success('Avatar updated!')
+                        } catch (err) {
+                          toast.error('Failed to update avatar')
+                        } finally {
+                          setSaving(false)
+                        }
+                      }
+                      reader.readAsDataURL(file)
                     }}
                   />
                 </label>
@@ -297,7 +305,7 @@ export function Profile() {
           <div className="space-y-3">
             {history.map((game, i) => (
               <Card
-                key={game.room_id}
+                key={i}
                 hover
                 onClick={() => handleViewGame(game)}
                 className="group"

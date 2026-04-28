@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Trophy, TrendingUp, Clock, Medal, ChevronLeft, ChevronRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Trophy, Medal, ChevronLeft, ChevronRight, History, Users, Star, Clock, Zap, Target } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Card, Avatar, EmptyState, LoadingSpinner, Button } from '../components/ui'
 import { supabase } from '../lib/supabase'
@@ -10,17 +10,27 @@ export function Leaderboard() {
   const { user, profile } = useAuth()
   const [rankings, setRankings] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('rankings')
   const [period, setPeriod] = useState('all')
   const [page, setPage] = useState(1)
   const [userGlobalRank, setUserGlobalRank] = useState(0)
+  const [gameHistory, setGameHistory] = useState([])
+  const [friends, setFriends] = useState([])
   const limit = 20
 
   useEffect(() => {
-    fetchRankings()
+    if (activeTab === 'rankings') {
+      fetchRankings()
+    } else if (activeTab === 'history' && user) {
+      fetchHistory()
+    } else if (activeTab === 'friends' && user) {
+      fetchFriends()
+    }
+
     if (user) {
       fetchUserRank()
     }
-  }, [period, page])
+  }, [activeTab, period, page])
 
   const fetchUserRank = async () => {
     const { data, error } = await supabase.rpc('get_user_rank', { p_user_id: user.id })
@@ -31,43 +41,77 @@ export function Leaderboard() {
 
   const fetchRankings = async () => {
     setLoading(true)
-
     try {
       let query = supabase
         .from('profiles')
         .select('*')
-        .order('total_score', { ascending: false })
-        .range((page - 1) * limit, page * limit - 1)
 
-      if (period === 'friends' && user) {
-        // Fetch friend IDs
-        const { data: friendsData } = await supabase
-          .from('friendships')
-          .select('sender_id, receiver_id')
-          .eq('status', 'accepted')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      if (period === 'weekly') {
+        query = query.order('weekly_score', { ascending: false })
+      } else if (period === 'monthly') {
+        query = query.order('monthly_score', { ascending: false })
+      } else {
+        query = query.order('total_score', { ascending: false })
+      }
 
-        const friendIds = friendsData ? friendsData.map(f =>
-          f.sender_id === user.id ? f.receiver_id : f.sender_id
-        ) : []
+      const { data, error } = await query.range((page - 1) * limit, page * limit - 1)
+      if (data) setRankings(data)
+    } catch (err) {
+      console.error('Error fetching rankings:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-        // Include self
-        friendIds.push(user.id)
+  const fetchHistory = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('room_players')
+        .select(`
+          room_id,
+          score,
+          answers_correct,
+          joined_at,
+          room:rooms(code, category, question_count, status)
+        `)
+        .eq('player_id', user.id)
+        .order('joined_at', { ascending: false })
+        .limit(20)
 
-        query = supabase
+      if (data) setGameHistory(data)
+    } catch (err) {
+      console.error('Error fetching history:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchFriends = async () => {
+    setLoading(true)
+    try {
+      const { data: friendsData } = await supabase
+        .from('friendships')
+        .select('sender_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+
+      const friendIds = friendsData ? friendsData.map(f =>
+        f.sender_id === user.id ? f.receiver_id : f.sender_id
+      ) : []
+
+      if (friendIds.length > 0) {
+        const { data } = await supabase
           .from('profiles')
           .select('*')
           .in('id', friendIds)
           .order('total_score', { ascending: false })
-          .range((page - 1) * limit, page * limit - 1)
-      }
-
-      const { data, error } = await query
-      if (data) {
-        setRankings(data)
+        setFriends(data || [])
+      } else {
+        setFriends([])
       }
     } catch (err) {
-      console.error('Error fetching rankings:', err)
+      console.error('Error fetching friends:', err)
     } finally {
       setLoading(false)
     }
@@ -77,24 +121,22 @@ export function Leaderboard() {
     <div className="min-h-screen pb-24 md:pb-6">
       {/* Hero */}
       <section className="relative py-12 px-4">
-        <div className="absolute inset-0 bg-gradient-to-b from-gold/10 via-transparent to-transparent" />
-
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
         <div className="relative max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-gold to-amber-500 mb-6"
+            className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary mb-6"
           >
             <Trophy className="w-10 h-10 text-white" />
           </motion.div>
-
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="text-3xl md:text-4xl font-bold text-white mb-2"
           >
-            Leaderboard
+            Leaderboard & Activity
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -102,149 +144,206 @@ export function Leaderboard() {
             transition={{ delay: 0.2 }}
             className="text-slate-400"
           >
-            Top quiz warriors worldwide
+            Track your progress and compete with the best
           </motion.p>
         </div>
       </section>
 
-      {/* User's Rank Card */}
+      {/* Stats Summary */}
       {user && profile && (
-        <section className="max-w-4xl mx-auto px-4 mb-6">
-          <Card className="bg-gradient-to-r from-primary/20 to-secondary/20 border-primary/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold"
-                  style={{ backgroundColor: getRankColor(userGlobalRank), color: userGlobalRank > 3 ? '#0F172A' : '#FFF' }}
-                >
-                  {userGlobalRank || '-'}
-                </div>
-                <div>
-                  <div className="font-bold text-white">Your Ranking</div>
-                  <div className="text-sm text-slate-400">{profile.username}</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-gradient">{profile.total_score.toLocaleString()}</div>
-                <div className="text-sm text-slate-400">points</div>
-              </div>
-            </div>
-          </Card>
+        <section className="max-w-4xl mx-auto px-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="bg-surface-light border-none p-4 text-center">
+              <div className="text-2xl font-bold text-primary">{userGlobalRank || '-'}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-widest mt-1">Global Rank</div>
+            </Card>
+            <Card className="bg-surface-light border-none p-4 text-center">
+              <div className="text-2xl font-bold text-gradient">{profile.total_score.toLocaleString()}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-widest mt-1">Total Points</div>
+            </Card>
+            <Card className="bg-surface-light border-none p-4 text-center">
+              <div className="text-2xl font-bold text-white">{profile.total_games || 0}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-widest mt-1">Games Played</div>
+            </Card>
+            <Card className="bg-surface-light border-none p-4 text-center">
+              <div className="text-2xl font-bold text-success">{profile.total_wins || 0}</div>
+              <div className="text-xs text-slate-500 uppercase tracking-widest mt-1">Wins</div>
+            </Card>
+          </div>
         </section>
       )}
 
-      {/* Period Filter */}
+      {/* Tabs */}
       <section className="max-w-4xl mx-auto px-4 mb-6">
-        <div className="flex items-center justify-center gap-2">
-          {['all', 'friends'].map(p => (
+        <div className="flex items-center justify-center gap-2 p-1 bg-surface-light rounded-xl max-w-md mx-auto">
+          {[
+            { id: 'rankings', label: 'Rankings', icon: Star },
+            { id: 'history', label: 'History', icon: History },
+            { id: 'friends', label: 'Friends', icon: Users }
+          ].map(tab => (
             <button
-              key={p}
-              onClick={() => { setPeriod(p); setPage(1); }}
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setPage(1); }}
               className={`
-                px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize
-                ${period === p
-                  ? 'bg-primary text-white'
-                  : 'bg-surface-light text-slate-400 hover:text-white'
+                flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
+                ${activeTab === tab.id
+                  ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                  : 'text-slate-400 hover:text-white'
                 }
               `}
             >
-              {p}
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
             </button>
           ))}
         </div>
       </section>
 
-      {/* Rankings List */}
+      {/* Tab Content */}
       <section className="max-w-4xl mx-auto px-4">
-        {loading ? (
-          <div className="py-12">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : rankings.length === 0 ? (
-          <EmptyState
-            icon={Trophy}
-            title="No rankings yet"
-            description="Be the first to climb the leaderboard!"
-          />
-        ) : (
-          <>
-            <div className="space-y-3">
-              {rankings.map((player, index) => (
-                <motion.div
-                  key={player.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
+        {activeTab === 'rankings' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-center gap-2">
+              {['all', 'weekly', 'monthly'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => { setPeriod(p); setPage(1); }}
+                  className={`
+                    px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all
+                    ${period === p
+                      ? 'bg-primary/20 text-primary border border-primary/30'
+                      : 'bg-surface-light text-slate-500 hover:text-white border border-transparent'
+                    }
+                  `}
                 >
-                  <Card
-                    hover={player.id !== user?.id}
-                    className={`
-                      ${player.id === user?.id ? 'border-primary/50 bg-primary/10' : ''}
-                    `}
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {loading ? <div className="py-12"><LoadingSpinner size="lg" /></div> : (
+              <div className="space-y-3">
+                {rankings.map((player, index) => (
+                  <motion.div
+                    key={player.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
                   >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg"
-                        style={{
-                          backgroundColor: getRankColor(index + 1 + (page - 1) * limit),
-                          color: index + 1 > 3 ? '#0F172A' : '#FFF'
-                        }}
-                      >
-                        {index + 1 + (page - 1) * limit <= 3 ? (
-                          <Medal className="w-5 h-5" />
-                        ) : (
-                          index + 1 + (page - 1) * limit
-                        )}
-                      </div>
-
-                      <Avatar username={player.username} size="md" />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-white truncate">
-                          {player.username}
-                          {player.id === user?.id && (
-                            <span className="ml-2 text-xs text-primary">(You)</span>
-                          )}
+                    <Card
+                      className={`
+                        ${player.id === user?.id ? 'border-primary/50 bg-primary/10' : ''}
+                      `}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg"
+                          style={{
+                            backgroundColor: getRankColor(index + 1 + (page - 1) * limit),
+                            color: index + 1 > 3 ? '#0F172A' : '#FFF'
+                          }}
+                        >
+                          {index + 1 + (page - 1) * limit <= 3 ? <Medal className="w-5 h-5" /> : index + 1 + (page - 1) * limit}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-slate-400">
-                          <span>{player.total_games || 0} games</span>
-                          <span>{player.total_wins || 0} wins</span>
+                        <Avatar username={player.username} avatarUrl={player.avatar_url} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-white truncate">{player.username} {player.id === user?.id && <span className="text-xs text-primary">(You)</span>}</div>
+                          <div className="text-xs text-slate-400">{player.total_games || 0} games • {player.total_wins || 0} wins</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-gradient">
+                            {period === 'weekly' ? (player.weekly_score || 0).toLocaleString() :
+                             period === 'monthly' ? (player.monthly_score || 0).toLocaleString() :
+                             (player.total_score || 0).toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase font-bold">points</div>
                         </div>
                       </div>
+                    </Card>
+                  </motion.div>
+                ))}
 
+                {/* Pagination */}
+                <div className="flex items-center justify-center gap-4 mt-8">
+                  <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-slate-400 text-sm">Page {page}</span>
+                  <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={rankings.length < limit}>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-4">
+            {loading ? <LoadingSpinner size="lg" /> : gameHistory.length === 0 ? (
+              <EmptyState icon={History} title="No games yet" description="Start playing to see your history here!" />
+            ) : (
+              gameHistory.map((game, i) => (
+                <motion.div
+                  key={game.room_id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <Card>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Zap className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-white uppercase text-sm">{game.room?.category}</div>
+                          <div className="text-xs text-slate-500">
+                            {new Date(game.joined_at).toLocaleDateString()} • {game.room?.question_count} Q
+                          </div>
+                        </div>
+                      </div>
                       <div className="text-right">
-                        <div className="text-xl font-bold text-gradient">
-                          {player.total_score?.toLocaleString() || 0}
-                        </div>
-                        <div className="text-xs text-slate-500">points</div>
+                        <div className="text-lg font-bold text-gradient">{game.score}</div>
+                        <div className="text-[10px] text-slate-500 uppercase font-bold">Points</div>
                       </div>
                     </div>
                   </Card>
                 </motion.div>
-              ))}
-            </div>
+              ))
+            )}
+          </div>
+        )}
 
-            {/* Pagination */}
-            <div className="flex items-center justify-center gap-4 mt-8">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-slate-400">Page {page}</span>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPage(p => p + 1)}
-                disabled={rankings.length < limit}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </>
+        {activeTab === 'friends' && (
+          <div className="space-y-4">
+            {loading ? <LoadingSpinner size="lg" /> : friends.length === 0 ? (
+              <EmptyState icon={Users} title="No friends yet" description="Add friends to compete with them on the leaderboard!" />
+            ) : (
+              friends.map((friend, i) => (
+                <motion.div
+                  key={friend.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <Card>
+                    <div className="flex items-center gap-4">
+                      <Avatar username={friend.username} avatarUrl={friend.avatar_url} size="md" />
+                      <div className="flex-1">
+                        <div className="font-bold text-white">{friend.username}</div>
+                        <div className="text-xs text-slate-400">{friend.total_score.toLocaleString()} total points</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-success font-bold">{friend.total_wins} wins</div>
+                        <div className="text-xs text-slate-500">{friend.total_games} games</div>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+              ))
+            )}
+          </div>
         )}
       </section>
     </div>
