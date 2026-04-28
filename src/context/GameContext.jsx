@@ -20,6 +20,25 @@ export function GameProvider({ children }) {
   const roundTimerRef = useRef(null)
 
   useEffect(() => {
+    // Cleanup if user logs out
+    if (!user) {
+      if (roomChannel) {
+        roomChannel.unsubscribe()
+        setRoomChannel(null)
+      }
+      setCurrentRoom(null)
+      setPlayers([])
+      setCurrentQuestion(null)
+      setCurrentRound(0)
+      setGameState(GAME_STATES.WAITING)
+      setAnswers({})
+      if (roundTimerRef.current) {
+        clearTimeout(roundTimerRef.current)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
     return () => {
       if (roomChannel) {
         roomChannel.unsubscribe()
