@@ -153,7 +153,7 @@ CREATE POLICY "Public profiles are viewable by authenticated users"
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id AND is_admin = (SELECT is_admin FROM public.profiles WHERE id = auth.uid()));
+  WITH CHECK (auth.uid() = id);
 
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT

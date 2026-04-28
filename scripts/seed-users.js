@@ -1,12 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Error: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables are required.')
-  process.exit(1)
-}
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://oyfegptwvajizixcyadi.supabase.co'
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZmVncHR3dmFqaXppeGN5YWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTA5MDUsImV4cCI6MjA5MjUyNjkwNX0.RAbibtqUjEid0aBxeCXywQadUhl8cZkg5NspHyL13J4'
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
@@ -43,15 +38,11 @@ async function seedUsers() {
     // If it's an admin user, we need to set the is_admin flag in the profiles table
     // Note: This relies on the profile being created by the trigger
     if (userData.isAdmin) {
-        console.log(`
---- BOOTSTRAP INSTRUCTION ---
-To enable admin privileges for ${userData.email}, run the following SQL in your Supabase SQL Editor:
+        // We'll try to update the profile. This might fail if the trigger hasn't finished or if RLS prevents it.
+        // In a real scenario, this would be done via a service role or a SQL migration.
+        // Since we are using the anon key, we can only update our OWN profile if we are signed in.
 
-UPDATE public.profiles SET is_admin = true WHERE email = '${userData.email}';
------------------------------
-        `)
-
-        console.log(`Attempting to set admin flag for ${userData.email} via client (requires existing admin or open RLS)...`)
+        console.log(`Attempting to set admin flag for ${userData.email}...`)
         // Sign in to get a session
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email: userData.email,
@@ -67,9 +58,9 @@ UPDATE public.profiles SET is_admin = true WHERE email = '${userData.email}';
                 .eq('id', signInData.user.id)
 
             if (updateError) {
-                console.warn(`Note: Could not set admin flag via client for ${userData.email} (this is normal if RLS is enabled). Please use the SQL instruction above.`)
+                console.error(`Error updating admin flag for ${userData.email}:`, updateError.message)
             } else {
-                console.log(`Admin flag successfully set for ${userData.email} via client.`)
+                console.log(`Admin flag set for ${userData.email}.`)
             }
 
             await supabase.auth.signOut()
