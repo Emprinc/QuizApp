@@ -9,21 +9,35 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
+    // Check session and verify user still exists
+    const initAuth = async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+          setUser(authUser)
+          await fetchProfile(authUser.id)
+        } else {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err)
+        setUser(null)
+        setProfile(null)
         setLoading(false)
       }
-    })
+    }
+
+    initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user ?? null)
         if (session?.user) {
+          setUser(session.user)
           await fetchProfile(session.user.id)
         } else {
+          setUser(null)
           setProfile(null)
         }
         setLoading(false)
@@ -54,11 +68,23 @@ export function AuthProvider({ children }) {
             setProfile(newProfile)
           } else {
             console.error('Error creating profile fallback:', createError)
+            // If we can't fetch or create a profile, the user might be deleted from DB
+            await signOut()
           }
         } else {
           console.error('Error fetching profile:', error)
+          // For other errors (like permission denied if user was deleted/banned in a way that blocks read)
+          if (error.status === 403 || error.status === 401) {
+            await signOut()
+          }
         }
       } else {
+        // Check for ban status
+        if (data.is_banned) {
+          console.warn('User is banned, signing out...')
+          await signOut()
+          return
+        }
         setProfile(data)
       }
     } catch (err) {
