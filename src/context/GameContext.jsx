@@ -151,14 +151,23 @@ export function GameProvider({ children }) {
   }, [])
 
   const broadcastEvent = useCallback((roomId, event, payload) => {
-    if (roomChannel && roomChannel.state === 'joined') {
-      roomChannel.send({
-        type: 'broadcast',
-        event,
-        payload: { ...payload, timestamp: Date.now() }
-      })
+    if (roomChannel && (roomChannel.state === 'joined' || roomChannel.state === 'joining')) {
+      // If still joining, we might want to wait or just attempt send as it might succeed if it joins quickly
+      // but 'joined' is the safest. However, we'll keep the joined check.
+      if (roomChannel.state === 'joined') {
+        roomChannel.send({
+          type: 'broadcast',
+          event,
+          payload: { ...payload, timestamp: Date.now() }
+        }).catch(err => {
+          console.error(`Error broadcasting ${event}:`, err)
+        })
+      } else {
+        // Queue or retry? For now, just log.
+        console.warn(`Cannot broadcast ${event}: channel in ${roomChannel.state} state`)
+      }
     } else {
-      console.warn(`Cannot broadcast ${event}: channel not joined`, roomChannel?.state)
+      console.warn(`Cannot broadcast ${event}: channel not initialized or in bad state`, roomChannel?.state)
     }
   }, [roomChannel])
 
@@ -228,7 +237,7 @@ export function GameProvider({ children }) {
       .select('*')
       .eq('room_id', room.id)
       .eq('player_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (!existingPlayer) {
       await supabase

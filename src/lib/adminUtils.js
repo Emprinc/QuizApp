@@ -7,7 +7,7 @@ export const adminQuestionUtils = {
       .from('questions')
       .insert([questionData])
       .select()
-      .single()
+      .maybeSingle()
     
     if (error) throw error
     return data
@@ -19,7 +19,7 @@ export const adminQuestionUtils = {
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
+      .maybeSingle()
     
     if (error) throw error
     return data
@@ -103,7 +103,7 @@ export const adminUserUtils = {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
     
     if (profileError) throw profileError
 
@@ -130,7 +130,7 @@ export const adminUserUtils = {
       .update({ is_admin: isAdmin })
       .eq('id', userId)
       .select()
-      .single()
+      .maybeSingle()
     
     if (error) throw error
     return data
@@ -144,7 +144,7 @@ export const adminUserUtils = {
       .update({ is_banned: true })
       .eq('id', userId)
       .select()
-      .single()
+      .maybeSingle()
     
     if (error) throw error
     return data
@@ -156,7 +156,7 @@ export const adminUserUtils = {
       .update({ is_banned: false })
       .eq('id', userId)
       .select()
-      .single()
+      .maybeSingle()
     
     if (error) throw error
     return data
@@ -196,7 +196,7 @@ export const adminRoomUtils = {
       .update({ status: 'finished' })
       .eq('id', roomId)
       .select()
-      .single()
+      .maybeSingle()
     
     if (error) throw error
     return data

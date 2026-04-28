@@ -101,16 +101,16 @@ export function AuthProvider({ children }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
-      if (error) {
-        if (error.code === 'PGRST116') {
+      if (error || !data) {
+        if (!data) {
           // Profile doesn't exist, try to create one (fallback if trigger fails)
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert([{ id: userId, username: userId.slice(0, 8) }])
             .select()
-            .single()
+            .maybeSingle()
 
           if (!createError) {
             setProfile(newProfile)

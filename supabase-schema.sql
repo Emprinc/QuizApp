@@ -180,7 +180,7 @@ CREATE TRIGGER on_auth_user_created
 -- Grant basic access to all users
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated;
-GRANT INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 -- Enable RLS on all tables

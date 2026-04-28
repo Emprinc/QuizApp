@@ -50,7 +50,7 @@ export function Landing() {
         // Players count
         const { count: profileCount, error: profileError } = await supabase
           .from('profiles')
-          .select('id', { count: 'exact', head: true })
+          .select('*', { count: 'exact', head: true })
 
         if (!profileError && profileCount !== null) {
           setStats(prev => ({ ...prev, totalPlayers: profileCount }))
@@ -59,17 +59,20 @@ export function Landing() {
         // Questions count
         const { count: questionCount, error: questionError } = await supabase
           .from('questions')
-          .select('id', { count: 'exact', head: true })
+          .select('*', { count: 'exact', head: true })
 
         if (!questionError && questionCount !== null) {
           setStats(prev => ({ ...prev, questionsAnswered: questionCount }))
         }
 
         // Online players (last seen in last 5 minutes)
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        // Ensure we use a valid timestamp that is not in the future
+        const now = new Date()
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString()
+
         const { count: onlineCount, error: onlineError } = await supabase
           .from('profiles')
-          .select('id', { count: 'exact', head: true })
+          .select('*', { count: 'exact', head: true })
           .gt('last_seen', fiveMinutesAgo)
 
         if (!onlineError && onlineCount !== null) {
