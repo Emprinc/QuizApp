@@ -12,40 +12,66 @@ export function Leaderboard() {
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState('all')
   const [page, setPage] = useState(1)
+  const [userGlobalRank, setUserGlobalRank] = useState(0)
   const limit = 20
 
   useEffect(() => {
     fetchRankings()
-  }, [period])
+    if (user) {
+      fetchUserRank()
+    }
+  }, [period, page])
+
+  const fetchUserRank = async () => {
+    const { data, error } = await supabase.rpc('get_user_rank', { p_user_id: user.id })
+    if (!error && data) {
+      setUserGlobalRank(data)
+    }
+  }
 
   const fetchRankings = async () => {
     setLoading(true)
 
-    let query = supabase
-      .from('profiles')
-      .select('*')
-      .order('total_score', { ascending: false })
-      .range((page - 1) * limit, page * limit)
-
-    if (period === 'daily' || period === 'weekly') {
-      // For demo purposes, show all-time since we don't track period-specific scores
-      query = supabase
+    try {
+      let query = supabase
         .from('profiles')
         .select('*')
         .order('total_score', { ascending: false })
-        .range((page - 1) * limit, page * limit)
+        .range((page - 1) * limit, page * limit - 1)
+
+      if (period === 'friends' && user) {
+        // Fetch friend IDs
+        const { data: friendsData } = await supabase
+          .from('friendships')
+          .select('sender_id, receiver_id')
+          .eq('status', 'accepted')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+
+        const friendIds = friendsData ? friendsData.map(f =>
+          f.sender_id === user.id ? f.receiver_id : f.sender_id
+        ) : []
+
+        // Include self
+        friendIds.push(user.id)
+
+        query = supabase
+          .from('profiles')
+          .select('*')
+          .in('id', friendIds)
+          .order('total_score', { ascending: false })
+          .range((page - 1) * limit, page * limit - 1)
+      }
+
+      const { data, error } = await query
+      if (data) {
+        setRankings(data)
+      }
+    } catch (err) {
+      console.error('Error fetching rankings:', err)
+    } finally {
+      setLoading(false)
     }
-
-    const { data, error } = await query
-
-    if (data) {
-      setRankings(data)
-    }
-
-    setLoading(false)
   }
-
-  const userRank = rankings.findIndex(r => r.id === user?.id) + 1 + (page - 1) * limit
 
   return (
     <div className="min-h-screen pb-24 md:pb-6">
@@ -89,9 +115,9 @@ export function Leaderboard() {
               <div className="flex items-center gap-4">
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold"
-                  style={{ backgroundColor: getRankColor(userRank), color: userRank > 3 ? '#0F172A' : '#FFF' }}
+                  style={{ backgroundColor: getRankColor(userGlobalRank), color: userGlobalRank > 3 ? '#0F172A' : '#FFF' }}
                 >
-                  {userRank}
+                  {userGlobalRank || '-'}
                 </div>
                 <div>
                   <div className="font-bold text-white">Your Ranking</div>
@@ -110,7 +136,7 @@ export function Leaderboard() {
       {/* Period Filter */}
       <section className="max-w-4xl mx-auto px-4 mb-6">
         <div className="flex items-center justify-center gap-2">
-          {['daily', 'weekly', 'all'].map(p => (
+          {['all', 'friends'].map(p => (
             <button
               key={p}
               onClick={() => { setPeriod(p); setPage(1); }}

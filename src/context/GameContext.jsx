@@ -20,6 +20,25 @@ export function GameProvider({ children }) {
   const roundTimerRef = useRef(null)
 
   useEffect(() => {
+    // Cleanup if user logs out
+    if (!user) {
+      if (roomChannel) {
+        roomChannel.unsubscribe()
+        setRoomChannel(null)
+      }
+      setCurrentRoom(null)
+      setPlayers([])
+      setCurrentQuestion(null)
+      setCurrentRound(0)
+      setGameState(GAME_STATES.WAITING)
+      setAnswers({})
+      if (roundTimerRef.current) {
+        clearTimeout(roundTimerRef.current)
+      }
+    }
+  }, [user])
+
+  useEffect(() => {
     return () => {
       if (roomChannel) {
         roomChannel.unsubscribe()
@@ -92,6 +111,14 @@ export function GameProvider({ children }) {
         if (roundTimerRef.current) {
           clearTimeout(roundTimerRef.current)
         }
+
+        // Synchronize final scores from broadcast
+        if (payload.finalScores) {
+          setPlayers(prev => prev.map(p => ({
+            ...p,
+            score: payload.finalScores[p.id] !== undefined ? payload.finalScores[p.id] : p.score
+          })))
+        }
       })
       .subscribe()
 
@@ -100,12 +127,14 @@ export function GameProvider({ children }) {
   }, [])
 
   const broadcastEvent = useCallback((roomId, event, payload) => {
-    if (roomChannel) {
+    if (roomChannel && roomChannel.state === 'joined') {
       roomChannel.send({
         type: 'broadcast',
         event,
         payload: { ...payload, timestamp: Date.now() }
       })
+    } else {
+      console.warn(`Cannot broadcast ${event}: channel not joined`, roomChannel?.state)
     }
   }, [roomChannel])
 
@@ -391,28 +420,47 @@ export function GameProvider({ children }) {
           .from('rooms')
           .update({ status: GAME_STATES.FINISHED })
           .eq('id', currentRoom.id)
+
+        // Fetch final scores to ensure synchronization
+        const { data: finalPlayers } = await supabase
+          .from('room_players')
+          .select('*, player:profiles(*)')
+          .eq('room_id', currentRoom.id)
+
+        if (finalPlayers) {
+          const mappedPlayers = finalPlayers.map(rp => ({
+            id: rp.player_id,
+            username: rp.player?.username || 'Unknown',
+            avatar_url: rp.player?.avatar_url,
+            isHost: rp.player_id === currentRoom.host_id,
+            score: rp.score
+          }))
+          setPlayers(mappedPlayers)
+
+          broadcastEvent(currentRoom.id, 'game_end', {
+            finalScores: mappedPlayers.reduce((acc, p) => {
+              acc[p.id] = p.score
+              return acc
+            }, {})
+          })
+        }
       } catch (err) {
         console.error('Error updating room status at end game:', err)
       }
     }
 
-    broadcastEvent(currentRoom.id, 'game_end', {
-      finalScores: players.reduce((acc, p) => {
-        acc[p.id] = p.score
-        return acc
-      }, {})
-    })
-
     // Update player stats
     if (user) {
       try {
+        const myPlayer = players.find(p => p.id === user.id)
         const winner = players.reduce((a, b) => (a.score > b.score ? a : b))
         const isWinner = winner?.id === user.id
 
         await supabase.rpc('update_player_stats', {
           p_user_id: user.id,
           p_games: 1,
-          p_wins: isWinner ? 1 : 0
+          p_wins: isWinner ? 1 : 0,
+          p_score: myPlayer?.score || 0
         })
       } catch (err) {
         console.error('Error updating player stats:', err)

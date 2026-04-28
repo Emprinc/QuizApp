@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.questions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   category TEXT NOT NULL,
   difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard')) DEFAULT 'medium',
-  question_text TEXT NOT NULL,
+  question_text TEXT UNIQUE NOT NULL, -- Added UNIQUE to help with idempotency
   options JSONB NOT NULL,
   correct_answer INTEGER NOT NULL CHECK (correct_answer BETWEEN 0 AND 3),
   explanation TEXT,
@@ -104,11 +104,28 @@ CREATE OR REPLACE FUNCTION public.update_player_stats(
 BEGIN
   UPDATE public.profiles
   SET
-    total_games = total_games + p_games,
-    total_wins = total_wins + p_wins,
-    total_score = total_score + p_score,
+    total_games = total_games + COALESCE(p_games, 0),
+    total_wins = total_wins + COALESCE(p_wins, 0),
+    total_score = total_score + COALESCE(p_score, 0),
     updated_at = NOW()
   WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user global rank
+CREATE OR REPLACE FUNCTION public.get_user_rank(p_user_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+    user_rank INTEGER;
+BEGIN
+    SELECT rank INTO user_rank
+    FROM (
+        SELECT id, RANK() OVER (ORDER BY total_score DESC) as rank
+        FROM public.profiles
+    ) sub
+    WHERE id = p_user_id;
+
+    RETURN user_rank;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -137,7 +154,7 @@ CREATE TRIGGER on_auth_user_created
 -- ROW LEVEL SECURITY & PERMISSIONS
 -- ============================================
 
--- Grant basic access to all users (needed for RLS to work correctly)
+-- Grant basic access to all users
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO authenticated;
@@ -152,87 +169,88 @@ ALTER TABLE public.player_answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
-CREATE POLICY "Public profiles are viewable by everyone"
-  ON public.profiles FOR SELECT
-  TO anon, authenticated
-  USING (true);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public profiles are viewable by everyone') THEN
+        CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT TO anon, authenticated USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own profile') THEN
+        CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert own profile') THEN
+        CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id AND is_admin = false);
+    END IF;
+END $$;
 
-CREATE POLICY "Users can update own profile"
-  ON public.profiles FOR UPDATE
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Users can insert own profile"
-  ON public.profiles FOR INSERT
-  WITH CHECK (auth.uid() = id AND is_admin = false);
-
--- Questions policies (read-only for everyone)
-CREATE POLICY "Questions are viewable by everyone"
-  ON public.questions FOR SELECT
-  TO anon, authenticated
-  USING (true);
+-- Questions policies
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Questions are viewable by everyone') THEN
+        CREATE POLICY "Questions are viewable by everyone" ON public.questions FOR SELECT TO anon, authenticated USING (true);
+    END IF;
+END $$;
 
 -- Rooms policies
-CREATE POLICY "Rooms are viewable by everyone"
-  ON public.rooms FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated users can create rooms"
-  ON public.rooms FOR INSERT
-  WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Hosts can update room status"
-  ON public.rooms FOR UPDATE
-  USING (auth.uid() = host_id);
-
-CREATE POLICY "Hosts can delete rooms"
-  ON public.rooms FOR DELETE
-  USING (auth.uid() = host_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Rooms are viewable by everyone') THEN
+        CREATE POLICY "Rooms are viewable by everyone" ON public.rooms FOR SELECT TO anon, authenticated USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Authenticated users can create rooms') THEN
+        CREATE POLICY "Authenticated users can create rooms" ON public.rooms FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Hosts can update room status') THEN
+        CREATE POLICY "Hosts can update room status" ON public.rooms FOR UPDATE USING (auth.uid() = host_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Hosts can delete rooms') THEN
+        CREATE POLICY "Hosts can delete rooms" ON public.rooms FOR DELETE USING (auth.uid() = host_id);
+    END IF;
+END $$;
 
 -- Room players policies
-CREATE POLICY "Room players are viewable by everyone"
-  ON public.room_players FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-CREATE POLICY "Authenticated users can join rooms"
-  ON public.room_players FOR INSERT
-  WITH CHECK (auth.uid() = player_id);
-
-CREATE POLICY "Players can update own score"
-  ON public.room_players FOR UPDATE
-  USING (auth.uid() = player_id);
-
-CREATE POLICY "Players can leave rooms"
-  ON public.room_players FOR DELETE
-  USING (auth.uid() = player_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Room players are viewable by everyone') THEN
+        CREATE POLICY "Room players are viewable by everyone" ON public.room_players FOR SELECT TO anon, authenticated USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Authenticated users can join rooms') THEN
+        CREATE POLICY "Authenticated users can join rooms" ON public.room_players FOR INSERT WITH CHECK (auth.uid() = player_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Players can update own score') THEN
+        CREATE POLICY "Players can update own score" ON public.room_players FOR UPDATE USING (auth.uid() = player_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Players can leave rooms') THEN
+        CREATE POLICY "Players can leave rooms" ON public.room_players FOR DELETE USING (auth.uid() = player_id);
+    END IF;
+END $$;
 
 -- Player answers policies
-CREATE POLICY "Users can view own answers"
-  ON public.player_answers FOR SELECT
-  USING (auth.uid() = player_id);
-
-CREATE POLICY "Users can insert own answers"
-  ON public.player_answers FOR INSERT
-  WITH CHECK (auth.uid() = player_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own answers') THEN
+        CREATE POLICY "Users can view own answers" ON public.player_answers FOR SELECT USING (auth.uid() = player_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert own answers') THEN
+        CREATE POLICY "Users can insert own answers" ON public.player_answers FOR INSERT WITH CHECK (auth.uid() = player_id);
+    END IF;
+END $$;
 
 -- Friendships policies
-CREATE POLICY "Friendships are viewable by participants"
-  ON public.friendships FOR SELECT
-  USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
-
-CREATE POLICY "Users can send friend requests"
-  ON public.friendships FOR INSERT
-  WITH CHECK (auth.uid() = sender_id);
-
-CREATE POLICY "Users can update own friendships"
-  ON public.friendships FOR UPDATE
-  USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
-
-CREATE POLICY "Users can delete own friendships"
-  ON public.friendships FOR DELETE
-  USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Friendships are viewable by participants') THEN
+        CREATE POLICY "Friendships are viewable by participants" ON public.friendships FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can send friend requests') THEN
+        CREATE POLICY "Users can send friend requests" ON public.friendships FOR INSERT WITH CHECK (auth.uid() = sender_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own friendships') THEN
+        CREATE POLICY "Users can update own friendships" ON public.friendships FOR UPDATE USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can delete own friendships') THEN
+        CREATE POLICY "Users can delete own friendships" ON public.friendships FOR DELETE USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+    END IF;
+END $$;
 
 -- ============================================
 -- INDEXES
@@ -277,12 +295,20 @@ INSERT INTO public.questions (category, difficulty, question_text, options, corr
 -- Technology
 ('tech', 'medium', 'What does CPU stand for?', '["Central Processing Unit", "Computer Personal Unit", "Central Program Unit", "Core Processing Unit"]', 0, 'CPU stands for Central Processing Unit.'),
 ('tech', 'easy', 'Who founded Microsoft?', '["Steve Jobs", "Bill Gates", "Mark Zuckerberg", "Elon Musk"]', 1, 'Bill Gates co-founded Microsoft in 1975.'),
-('tech', 'hard', 'What year was YouTube founded?', '["2003", "2004", "2005", "2006"]', 2, 'YouTube was founded in February 2005.');
+('tech', 'hard', 'What year was YouTube founded?', '["2003", "2004", "2005", "2006"]', 2, 'YouTube was founded in February 2005.')
+ON CONFLICT (question_text) DO NOTHING;
 
 -- ============================================
 -- REALTIME CONFIGURATION
 -- ============================================
 
 -- Enable realtime for rooms table
-ALTER PUBLICATION supabase_realtime ADD TABLE public.rooms;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.room_players;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'rooms') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.rooms;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'room_players') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.room_players;
+    END IF;
+END $$;
