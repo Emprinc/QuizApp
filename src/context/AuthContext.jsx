@@ -13,7 +13,17 @@ export function AuthProvider({ children }) {
     // Check session and verify user still exists
     const initAuth = async () => {
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser()
+        const { data: { user: authUser }, error } = await supabase.auth.getUser()
+
+        if (error) {
+          if (error.message.includes('refresh_token_not_found') || error.status === 400) {
+            console.warn('Session invalid, clearing state...')
+            await signOut()
+            return
+          }
+          throw error
+        }
+
         if (authUser) {
           setUser(authUser)
           await fetchProfile(authUser.id)

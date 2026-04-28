@@ -144,7 +144,7 @@ export function Room() {
                 <LogOut className="w-4 h-4" />
                 Leave Room
               </Button>
-              <Button className="flex-1" onClick={() => navigate('/lobby')}>
+              <Button className="flex-1" onClick={handleLeave}>
                 Play Again
               </Button>
             </div>
