@@ -25,48 +25,52 @@ export function Landing() {
       }))
     }
 
-    // Fetch recent games (now accessible to everyone)
-    supabase
-      .from('rooms')
-      .select(`
-        *,
-        players:room_players(count)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(5)
-      .then(({ data }) => {
-        if (data) {
-          setRecentGames(data)
-        }
-      })
-      .catch(err => console.error('Error fetching recent games:', err))
+    // Fetch recent games
+    const fetchRecentGames = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('rooms')
+          .select(`
+            *,
+            players:room_players(count)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(5)
 
-    // Fetch global stats (with error handling for unauthenticated requests)
-    supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .then(({ count }) => {
-        if (count !== null) {
-          setStats(prev => ({ ...prev, totalPlayers: count }))
-        }
-      })
-      .catch(() => {
-        // Silently fail for unauthenticated requests - optional display
-        setStats(prev => ({ ...prev, totalPlayers: 0 }))
-      })
+        if (error) throw error
+        if (data) setRecentGames(data)
+      } catch (err) {
+        console.error('Error fetching recent games:', err.message)
+      }
+    }
 
-    supabase
-      .from('questions')
-      .select('id', { count: 'exact', head: true })
-      .then(({ count }) => {
-        if (count !== null) {
-          setStats(prev => ({ ...prev, questionsAnswered: count }))
+    // Fetch global stats
+    const fetchGlobalStats = async () => {
+      try {
+        // Players count
+        const { count: profileCount, error: profileError } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+
+        if (!profileError && profileCount !== null) {
+          setStats(prev => ({ ...prev, totalPlayers: profileCount }))
         }
-      })
-      .catch(() => {
-        // Silently fail for unauthenticated requests - optional display
-        setStats(prev => ({ ...prev, questionsAnswered: 0 }))
-      })
+
+        // Questions count
+        const { count: questionCount, error: questionError } = await supabase
+          .from('questions')
+          .select('id', { count: 'exact', head: true })
+
+        if (!questionError && questionCount !== null) {
+          setStats(prev => ({ ...prev, questionsAnswered: questionCount }))
+        }
+      } catch (err) {
+        console.warn('Error fetching global stats:', err.message)
+      }
+    }
+
+    fetchRecentGames()
+    fetchGlobalStats()
   }, [user, profile])
 
   const features = [

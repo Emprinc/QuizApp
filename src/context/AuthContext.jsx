@@ -41,22 +41,28 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .single()
 
-      if (error && error.code === 'PGRST116') {
-        // Profile doesn't exist, create one
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert([{ id: userId, username: userId.slice(0, 8) }])
-          .select()
-          .single()
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, try to create one (fallback if trigger fails)
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([{ id: userId, username: userId.slice(0, 8) }])
+            .select()
+            .single()
 
-        if (!createError) {
-          setProfile(newProfile)
+          if (!createError) {
+            setProfile(newProfile)
+          } else {
+            console.error('Error creating profile fallback:', createError)
+          }
+        } else {
+          console.error('Error fetching profile:', error)
         }
-      } else if (!error) {
+      } else {
         setProfile(data)
       }
     } catch (err) {
-      console.error('Error fetching profile:', err)
+      console.error('Unexpected error in fetchProfile:', err)
     } finally {
       setLoading(false)
     }
@@ -66,20 +72,17 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username: username || email.split('@')[0]
+        }
+      }
     })
 
     if (error) throw error
 
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: data.user.id,
-          username: username || email.split('@')[0]
-        }])
-
-      if (profileError) console.error('Profile creation error:', profileError)
-    }
+    // Note: Database trigger 'handle_new_user' creates the profile automatically.
+    // We don't need to manually insert it here anymore, which avoids RLS/conflict issues.
 
     return data
   }
