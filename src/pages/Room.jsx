@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, Check, Users, Zap, Clock, Play, LogOut, Trophy } from 'lucide-react'
+import { Copy, Check, Users, Zap, Clock, Play, LogOut, Trophy, Sparkles, X } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { Button, Card, Avatar, LoadingSpinner } from '../components/ui'
@@ -88,6 +88,9 @@ export function Room() {
             payload: {}
           })
         }
+
+        // Host manually resets local state
+        setShowReview(false)
       } catch (err) {
         toast.error('Failed to reset game')
       }
@@ -131,11 +134,14 @@ export function Room() {
 
   const handleShowReview = async () => {
     try {
-      const { data: answers } = await supabase
+      const { data: answers, error } = await supabase
         .from('player_answers')
         .select('*, question:questions(*)')
         .eq('room_id', currentRoom.id)
         .eq('player_id', user.id)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
 
       if (answers) {
         setReviewQuestions(answers)
@@ -201,12 +207,14 @@ export function Room() {
                   <LogOut className="w-4 h-4" />
                   Leave Room
                 </Button>
-                <Button className="flex-1" onClick={handlePlayAgain}>
-                  Play Again
-                </Button>
+                {isHost && (
+                  <Button className="flex-1" onClick={handlePlayAgain}>
+                    Play Again
+                  </Button>
+                )}
               </div>
-              <Button variant="ghost" className="w-full" onClick={handleShowReview}>
-                Review Questions
+              <Button variant="ghost" className="w-full border border-white/10" onClick={handleShowReview}>
+                Review Questions & Explanations
               </Button>
             </div>
           </Card>
@@ -226,9 +234,34 @@ export function Room() {
                     <Button variant="ghost" onClick={() => setShowReview(false)}>Close</Button>
                   </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <Card className="p-4 text-center bg-surface-light/50">
+                      <div className="text-2xl font-bold text-white">
+                        {reviewQuestions.filter(q => q.is_correct).length}/{reviewQuestions.length}
+                      </div>
+                      <div className="text-xs text-slate-400 uppercase tracking-widest mt-1">Total Accuracy</div>
+                    </Card>
+                    <Card className="p-4 text-center bg-surface-light/50">
+                      <div className="text-2xl font-bold text-primary">
+                        {reviewQuestions.reduce((sum, q) => sum + (q.score_earned || 0), 0)}
+                      </div>
+                      <div className="text-xs text-slate-400 uppercase tracking-widest mt-1">Total Points</div>
+                    </Card>
+                    <Card className="p-4 text-center bg-surface-light/50">
+                      <div className="text-2xl font-bold text-gold">
+                        {(reviewQuestions.reduce((sum, q) => sum + (q.time_taken_ms || 0), 0) / 1000).toFixed(1)}s
+                      </div>
+                      <div className="text-xs text-slate-400 uppercase tracking-widest mt-1">Total Time Spent</div>
+                    </Card>
+                  </div>
+
                   <div className="space-y-6 pb-20">
                     {reviewQuestions.map((item, idx) => (
-                      <Card key={item.id} className="p-6">
+                      <Card key={item.id} className="p-6 relative overflow-hidden group">
+                        <div className={`absolute top-0 right-0 px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${item.is_correct ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
+                          {item.is_correct ? 'Correct' : 'Incorrect'}
+                        </div>
+
                         <div className="flex items-start gap-4 mb-4">
                           <div className={`
                             w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold
@@ -236,10 +269,22 @@ export function Room() {
                           `}>
                             {idx + 1}
                           </div>
-                          <h3 className="text-lg font-bold text-white">{item.question?.question_text}</h3>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-white mb-1">{item.question?.question_text}</h3>
+                            <div className="flex items-center gap-3 text-xs text-slate-500">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {(item.time_taken_ms / 1000).toFixed(2)}s
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Zap className="w-3 h-3" />
+                                {item.score_earned} pts
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
                           {item.question?.options.map((opt, oIdx) => {
                             const isCorrect = oIdx === item.question.correct_answer
                             const isYourAnswer = oIdx === item.answer
@@ -248,24 +293,31 @@ export function Room() {
                               <div
                                 key={oIdx}
                                 className={`
-                                  p-3 rounded-lg border-2 text-sm
-                                  ${isCorrect ? 'bg-success/20 border-success text-white' :
-                                    isYourAnswer && !isCorrect ? 'bg-danger/20 border-danger text-white' :
+                                  p-4 rounded-xl border-2 text-sm transition-all
+                                  ${isCorrect ? 'bg-success/10 border-success text-white font-medium' :
+                                    isYourAnswer && !isCorrect ? 'bg-danger/10 border-danger text-white font-medium' :
                                     'bg-surface-light border-transparent text-slate-400'}
                                 `}
                               >
-                                {opt}
-                                {isCorrect && <span className="ml-2 text-xs font-bold">(Correct)</span>}
-                                {isYourAnswer && !isCorrect && <span className="ml-2 text-xs font-bold">(Your Answer)</span>}
+                                <div className="flex items-center justify-between">
+                                  <span>{opt}</span>
+                                  {isCorrect && <Check className="w-4 h-4 text-success" />}
+                                  {isYourAnswer && !isCorrect && <X className="w-4 h-4 text-danger" />}
+                                </div>
+                                {isCorrect && <span className="text-[10px] uppercase font-bold text-success/70">Correct Answer</span>}
+                                {isYourAnswer && !isCorrect && <span className="text-[10px] uppercase font-bold text-danger/70">Your Answer</span>}
                               </div>
                             )
                           })}
                         </div>
 
                         {item.question?.explanation && (
-                          <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
-                            <p className="text-sm text-slate-300">
-                              <span className="font-bold text-primary mr-2">Explanation:</span>
+                          <div className="p-5 bg-primary/5 rounded-2xl border border-primary/10">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Sparkles className="w-4 h-4 text-primary" />
+                              <span className="text-xs font-bold text-primary uppercase tracking-widest">Explanation</span>
+                            </div>
+                            <p className="text-sm text-slate-300 leading-relaxed">
                               {item.question.explanation}
                             </p>
                           </div>
