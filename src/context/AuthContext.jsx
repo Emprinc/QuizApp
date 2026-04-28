@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import toast from 'react-hot-toast'
 
 const AuthContext = createContext(null)
 
@@ -46,6 +47,43 @@ export function AuthProvider({ children }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Idle Logout Logic (5 minutes)
+  const idleTimerRef = useRef(null)
+  const IDLE_TIMEOUT = 5 * 60 * 1000 // 5 minutes
+
+  const resetIdleTimer = () => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    if (user) {
+      idleTimerRef.current = setTimeout(() => {
+        toast('Session expired due to inactivity', { icon: '⏰' })
+        signOut()
+      }, IDLE_TIMEOUT)
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
+
+      const handleActivity = () => resetIdleTimer()
+
+      events.forEach(event => {
+        window.addEventListener(event, handleActivity)
+      })
+
+      resetIdleTimer()
+
+      return () => {
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+        events.forEach(event => {
+          window.removeEventListener(event, handleActivity)
+        })
+      }
+    } else {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    }
+  }, [user])
 
   const fetchProfile = async (userId) => {
     try {
@@ -123,10 +161,17 @@ export function AuthProvider({ children }) {
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
-    setUser(null)
-    setProfile(null)
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      if (error) throw error
+      toast.success('Signed out successfully')
+    } catch (error) {
+      console.error('Logout error:', error)
+      toast.error(error.message || 'Failed to sign out')
+    } finally {
+      setUser(null)
+      setProfile(null)
+    }
   }
 
   const updateProfile = async (updates) => {
