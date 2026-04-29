@@ -3,10 +3,8 @@ import { motion } from 'framer-motion'
 import { Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { adminQuestionUtils } from '../../lib/adminUtils'
 import { Card, Button, LoadingSpinner } from '../ui'
+import { CATEGORIES, DIFFICULTIES } from '../../lib/constants'
 import toast from 'react-hot-toast'
-
-const DIFFICULTIES = ['easy', 'medium', 'hard']
-const CATEGORIES = ['general', 'science', 'history', 'sports', 'entertainment', 'tech']
 
 export function QuestionManager() {
   const [questions, setQuestions] = useState([])
@@ -21,7 +19,7 @@ export function QuestionManager() {
   const itemsPerPage = 10
 
   const [formData, setFormData] = useState({
-    category: 'general',
+    category: CATEGORIES[0].id,
     difficulty: 'medium',
     question_text: '',
     options: ['', '', '', ''],
@@ -115,7 +113,7 @@ export function QuestionManager() {
 
   const resetForm = () => {
     setFormData({
-      category: 'general',
+      category: CATEGORIES[0].id,
       difficulty: 'medium',
       question_text: '',
       options: ['', '', '', ''],
@@ -188,7 +186,7 @@ export function QuestionManager() {
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
                   >
                     {CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -301,7 +299,7 @@ export function QuestionManager() {
         >
           <option value="">All Categories</option>
           {CATEGORIES.map(cat => (
-            <option key={cat} value={cat}>{cat}</option>
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
 

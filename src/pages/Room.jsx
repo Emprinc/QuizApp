@@ -22,7 +22,9 @@ export function Room() {
     createRoom,
     joinRoom,
     leaveRoom,
-    startGame
+    startGame,
+    roomChannel,
+    resetGame
   } = useGame()
 
   const [copied, setCopied] = useState(false)
@@ -90,7 +92,9 @@ export function Room() {
         }
 
         // Host manually resets local state
+        resetGame()
         setShowReview(false)
+        toast.success('Room reset for rematch!')
       } catch (err) {
         toast.error('Failed to reset game')
       }

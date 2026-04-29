@@ -267,10 +267,10 @@ export function Profile() {
         <h2 className="text-lg font-bold text-white mb-4">Achievements</h2>
         <Card>
           <div className="flex items-center gap-4 text-slate-400">
-            <Trophy className="w-8 h-8 text-gold" />
+            <Trophy className="w-8 h-8 text-gold opacity-50" />
             <div>
-              <div className="font-medium text-white">No achievements yet</div>
-              <div className="text-sm">Play games to unlock achievements!</div>
+              <div className="font-medium text-white italic">Achievements system coming soon</div>
+              <div className="text-sm">Battle more to unlock exclusive badges!</div>
             </div>
           </div>
         </Card>

@@ -137,11 +137,7 @@ export function GameProvider({ children }) {
         }
       })
       .on('broadcast', { event: 'rematch' }, () => {
-        setGameState(GAME_STATES.WAITING)
-        setCurrentRound(0)
-        setCurrentQuestion(null)
-        setCurrentRoom(prev => prev ? { ...prev, status: GAME_STATES.WAITING } : null)
-        setPlayers(prev => prev.map(p => ({ ...p, score: 0, answers_correct: 0 })))
+        resetGame()
         toast('Rematch starting soon!', { icon: '🎮' })
       })
       .subscribe()
@@ -436,6 +432,7 @@ export function GameProvider({ children }) {
     setCurrentQuestion(displayQuestion)
     setCurrentRound(roundNumber)
     setGameState(GAME_STATES.PLAYING)
+    setAnswers({})
 
     // Omit the correct answer from the broadcast to prevent client-side cheating
     const { correctAnswer, ...safeQuestion } = displayQuestion
@@ -553,7 +550,7 @@ export function GameProvider({ children }) {
             id: rp.player_id,
             username: rp.player?.username || 'Unknown',
             avatar_url: rp.player?.avatar_url,
-            isHost: rp.room_id === currentRoom.host_id,
+            isHost: rp.player_id === currentRoom.host_id,
             score: rp.score
           }))
           setPlayers(mappedPlayers)
@@ -586,6 +583,15 @@ export function GameProvider({ children }) {
     }
   }
 
+  const resetGame = useCallback(() => {
+    setGameState(GAME_STATES.WAITING)
+    setCurrentRound(0)
+    setCurrentQuestion(null)
+    setCurrentRoom(prev => prev ? { ...prev, status: GAME_STATES.WAITING } : null)
+    setPlayers(prev => prev.map(p => ({ ...p, score: 0, answers_correct: 0 })))
+    setAnswers({})
+  }, [])
+
   const getInviteLink = () => {
     if (!currentRoom) return ''
     const baseUrl = window.location.origin
@@ -608,7 +614,8 @@ export function GameProvider({ children }) {
       startGame,
       submitAnswer,
       getInviteLink,
-      subscribeToRoom
+      subscribeToRoom,
+      resetGame
     }}>
       {children}
     </GameContext.Provider>
