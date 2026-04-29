@@ -229,7 +229,11 @@ export function Friends() {
                       </div>
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="secondary" onClick={() => navigate('/lobby')}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => navigate('/lobby', { state: { challengeUser: friend } })}
+                      >
                         <Sword className="w-4 h-4" />
                         Challenge
                       </Button>

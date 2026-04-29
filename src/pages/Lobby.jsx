@@ -7,10 +7,11 @@ import { Button, Card, Avatar, Modal } from '../components/ui'
 import { CATEGORIES, QUESTION_COUNTS, TIME_OPTIONS } from '../lib/constants'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export function Lobby() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, profile } = useAuth()
   const { currentRoom, players, createRoom, joinRoom, leaveRoom } = useGame()
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -20,7 +21,7 @@ export function Lobby() {
   const [copied, setCopied] = useState(false)
 
   const [createForm, setCreateForm] = useState({
-    category: 'general',
+    category: CATEGORIES[0].id,
     questionCount: 10,
     timePerQuestion: 15
   })
@@ -28,6 +29,13 @@ export function Lobby() {
   const [joinCode, setJoinCode] = useState('')
 
   useEffect(() => {
+    // Handle challenge state
+    if (location.state?.challengeUser) {
+      const { challengeUser } = location.state
+      setShowCreateModal(true)
+      toast(`Challenging ${challengeUser.username}!`, { icon: '⚔️' })
+    }
+
     // Fetch active rooms
     fetchActiveRooms()
 

@@ -152,6 +152,41 @@ export function Profile() {
     }
   ]
 
+  const achievements = [
+    {
+      id: 'first_win',
+      name: 'First Blood',
+      description: 'Win your first game',
+      requirement: (p) => p?.total_wins >= 1,
+      icon: Zap,
+      color: 'text-success'
+    },
+    {
+      id: 'veteran',
+      name: 'Quiz Veteran',
+      description: 'Play 10 games',
+      requirement: (p) => p?.total_games >= 10,
+      icon: Target,
+      color: 'text-primary'
+    },
+    {
+      id: 'high_scorer',
+      name: 'High Scorer',
+      description: 'Reach 1,000 total points',
+      requirement: (p) => p?.total_score >= 1000,
+      icon: Trophy,
+      color: 'text-gold'
+    },
+    {
+      id: 'master',
+      name: 'Mastermind',
+      description: 'Reach 10,000 total points',
+      requirement: (p) => p?.total_score >= 10000,
+      icon: Sparkles,
+      color: 'text-secondary'
+    }
+  ]
+
   return (
     <div className="min-h-screen pb-24 md:pb-6">
       {/* Profile Header */}
@@ -262,18 +297,39 @@ export function Profile() {
         </div>
       </section>
 
-      {/* Achievement Preview */}
+      {/* Achievements Section */}
       <section className="max-w-2xl mx-auto px-4 mb-6">
         <h2 className="text-lg font-bold text-white mb-4">Achievements</h2>
-        <Card>
-          <div className="flex items-center gap-4 text-slate-400">
-            <Trophy className="w-8 h-8 text-gold" />
-            <div>
-              <div className="font-medium text-white">No achievements yet</div>
-              <div className="text-sm">Play games to unlock achievements!</div>
-            </div>
-          </div>
-        </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {achievements.map((achievement) => {
+            const isUnlocked = achievement.requirement(profile)
+            const Icon = achievement.icon
+
+            return (
+              <Card
+                key={achievement.id}
+                className={`flex items-center gap-4 p-4 transition-all ${isUnlocked ? 'border-primary/20' : 'opacity-50 grayscale bg-surface/50'}`}
+              >
+                <div className={`w-12 h-12 rounded-full bg-surface-light flex items-center justify-center shrink-0 ${isUnlocked ? achievement.color : 'text-slate-600'}`}>
+                  <Icon className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className={`font-bold ${isUnlocked ? 'text-white' : 'text-slate-400'}`}>
+                    {achievement.name}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {achievement.description}
+                  </div>
+                </div>
+                {isUnlocked && (
+                  <div className="ml-auto">
+                    <Check className="w-5 h-5 text-success" />
+                  </div>
+                )}
+              </Card>
+            )
+          })}
+        </div>
       </section>
 
       {/* Game History */}

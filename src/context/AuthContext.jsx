@@ -10,6 +10,22 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true;
+
+    const handleAuthChange = async (authUser) => {
+      if (!authUser) {
+        if (mounted) {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+        }
+        return
+      }
+
+      if (mounted) setUser(authUser)
+      await fetchProfile(authUser.id)
+    }
+
     // Check session and verify user still exists
     const initAuth = async () => {
       try {
@@ -24,19 +40,14 @@ export function AuthProvider({ children }) {
           throw error
         }
 
-        if (authUser) {
-          setUser(authUser)
-          await fetchProfile(authUser.id)
-        } else {
+        await handleAuthChange(authUser)
+      } catch (err) {
+        console.error('Auth initialization error:', err)
+        if (mounted) {
           setUser(null)
           setProfile(null)
           setLoading(false)
         }
-      } catch (err) {
-        console.error('Auth initialization error:', err)
-        setUser(null)
-        setProfile(null)
-        setLoading(false)
       }
     }
 
@@ -44,18 +55,22 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
-          setUser(session.user)
-          await fetchProfile(session.user.id)
-        } else {
-          setUser(null)
-          setProfile(null)
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          await handleAuthChange(session?.user)
+        } else if (event === 'SIGNED_OUT') {
+          if (mounted) {
+            setUser(null)
+            setProfile(null)
+            setLoading(false)
+          }
         }
-        setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Idle Logout Logic (5 minutes)
