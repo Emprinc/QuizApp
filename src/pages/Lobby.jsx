@@ -20,7 +20,7 @@ export function Lobby() {
   const [copied, setCopied] = useState(false)
 
   const [createForm, setCreateForm] = useState({
-    category: 'general',
+    category: CATEGORIES[0].id,
     questionCount: 10,
     timePerQuestion: 15
   })
