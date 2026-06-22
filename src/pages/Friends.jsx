@@ -23,41 +23,69 @@ export function Friends() {
       fetchFriends()
       fetchRequests()
     }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const fetchFriends = async () => {
-    const { data } = await supabase
-      .from('friendships')
-      .select(`
-        *,
-        sender:profiles!friendships_sender_id_fkey(*),
-        receiver:profiles!friendships_receiver_id_fkey(*)
-      `)
-      .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
-      .eq('status', 'accepted')
+    try {
+      const { data, error } = await supabase
+        .from('friendships')
+        .select(`
+          *,
+          sender:profiles!friendships_sender_id_fkey(*),
+          receiver:profiles!friendships_receiver_id_fkey(*)
+        `)
+        .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
+        .eq('status', 'accepted')
 
-    if (data) {
-      const friendList = data.map(f => {
-        const friend = f.sender_id === user?.id ? f.receiver : f.sender
-        return { ...friend, friendshipId: f.id }
-      })
-      setFriends(friendList)
+      if (error) {
+        console.error('Error fetching friends:', error)
+        setFriends([])
+        return
+      }
+
+      if (data) {
+        const friendList = data.map(f => {
+          const friend = f.sender_id === user?.id ? f.receiver : f.sender
+          return { ...friend, friendshipId: f.id }
+        })
+        setFriends(friendList)
+      } else {
+        setFriends([])
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching friends:', err)
+      setFriends([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const fetchRequests = async () => {
-    const { data } = await supabase
-      .from('friendships')
-      .select(`
-        *,
-        sender:profiles!friendships_sender_id_fkey(*)
-      `)
-      .eq('receiver_id', user?.id)
-      .eq('status', 'pending')
+    try {
+      const { data, error } = await supabase
+        .from('friendships')
+        .select(`
+          *,
+          sender:profiles!friendships_sender_id_fkey(*)
+        `)
+        .eq('receiver_id', user?.id)
+        .eq('status', 'pending')
 
-    if (data) {
-      setRequests(data.map(r => ({ ...r.sender, friendshipId: r.id })))
+      if (error) {
+        console.error('Error fetching requests:', error)
+        setRequests([])
+        return
+      }
+
+      if (data) {
+        setRequests(data.map(r => ({ ...r.sender, friendshipId: r.id })))
+      } else {
+        setRequests([])
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching requests:', err)
+      setRequests([])
     }
   }
 
@@ -108,38 +136,61 @@ export function Friends() {
   }
 
   const handleAcceptRequest = async (friendshipId) => {
-    const { error } = await supabase
-      .from('friendships')
-      .update({ status: 'accepted' })
-      .eq('id', friendshipId)
+    try {
+      const { error } = await supabase
+        .from('friendships')
+        .update({ status: 'accepted' })
+        .eq('id', friendshipId)
 
-    if (!error) {
+      if (error) {
+        toast.error('Failed to accept request')
+        return
+      }
+
       toast.success('Friend added!')
-      fetchFriends()
-      fetchRequests()
+      await Promise.all([fetchFriends(), fetchRequests()])
+    } catch (err) {
+      console.error('Error accepting request:', err)
+      toast.error('Failed to accept request')
     }
   }
 
   const handleRejectRequest = async (friendshipId) => {
-    const { error } = await supabase
-      .from('friendships')
-      .delete()
-      .eq('id', friendshipId)
+    try {
+      const { error } = await supabase
+        .from('friendships')
+        .delete()
+        .eq('id', friendshipId)
 
-    if (!error) {
-      fetchRequests()
+      if (error) {
+        toast.error('Failed to reject request')
+        return
+      }
+
+      await fetchRequests()
+    } catch (err) {
+      console.error('Error rejecting request:', err)
+      toast.error('Failed to reject request')
     }
   }
 
   const handleRemoveFriend = async (friendshipId) => {
-    const { error } = await supabase
-      .from('friendships')
-      .delete()
-      .eq('id', friendshipId)
+    try {
+      const { error } = await supabase
+        .from('friendships')
+        .delete()
+        .eq('id', friendshipId)
 
-    if (!error) {
+      if (error) {
+        toast.error('Failed to remove friend')
+        return
+      }
+
       toast.success('Friend removed')
-      fetchFriends()
+      await fetchFriends()
+    } catch (err) {
+      console.error('Error removing friend:', err)
+      toast.error('Failed to remove friend')
     }
   }
 

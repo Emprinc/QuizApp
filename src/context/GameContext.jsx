@@ -51,101 +51,107 @@ export function GameProvider({ children }) {
   }, [roomChannel])
 
   const subscribeToRoom = useCallback((roomId) => {
-    if (roomChannel) {
-      roomChannel.unsubscribe()
-    }
+    try {
+      // Cleanup existing subscription
+      if (roomChannel) {
+        roomChannel.unsubscribe()
+      }
 
-    const channel = supabase.channel(`room:${roomId}`)
+      const channel = supabase.channel(`room:${roomId}`)
 
-    channel
-      .on('broadcast', { event: 'player_joined' }, ({ payload }) => {
-        setPlayers(prev => {
-          if (!prev.find(p => p.id === payload.playerId)) {
-            return [...prev, {
-              id: payload.playerId,
-              username: payload.username,
-              avatar_url: payload.avatar_url,
-              isHost: payload.isHost
-            }]
-          }
-          return prev
+      channel
+        .on('broadcast', { event: 'player_joined' }, ({ payload }) => {
+          setPlayers(prev => {
+            if (!prev.find(p => p.id === payload.playerId)) {
+              return [...prev, {
+                id: payload.playerId,
+                username: payload.username,
+                avatar_url: payload.avatar_url,
+                isHost: payload.isHost
+              }]
+            }
+            return prev
+          })
         })
-      })
-      .on('broadcast', { event: 'player_left' }, ({ payload }) => {
-        setPlayers(prev => prev.filter(p => p.id !== payload.playerId))
-      })
-      .on('broadcast', { event: 'game_start' }, () => {
-        setGameState(GAME_STATES.PLAYING)
-        setCurrentRound(0)
-      })
-      .on('broadcast', { event: 'question' }, ({ payload }) => {
-        setCurrentQuestion(payload.question)
-        setCurrentRound(payload.round)
-        setAnswers({})
-        setScores(prev => ({...prev, [payload.round]: {}}))
-      })
-      .on('broadcast', { event: 'answer_result' }, ({ payload }) => {
-        const { playerId, answer, isCorrect, timeTaken, pointsEarned } = payload
+        .on('broadcast', { event: 'player_left' }, ({ payload }) => {
+          setPlayers(prev => prev.filter(p => p.id !== payload.playerId))
+        })
+        .on('broadcast', { event: 'game_start' }, () => {
+          setGameState(GAME_STATES.PLAYING)
+          setCurrentRound(0)
+        })
+        .on('broadcast', { event: 'question' }, ({ payload }) => {
+          setCurrentQuestion(payload.question)
+          setCurrentRound(payload.round)
+          setAnswers({})
+          setScores(prev => ({...prev, [payload.round]: {}}))
+        })
+        .on('broadcast', { event: 'answer_result' }, ({ payload }) => {
+          const { playerId, answer, isCorrect, timeTaken, pointsEarned } = payload
 
-        setAnswers(prev => ({
-          ...prev,
-          [playerId]: { answer, isCorrect, timeTaken, pointsEarned }
-        }))
+          setAnswers(prev => ({
+            ...prev,
+            [playerId]: { answer, isCorrect, timeTaken, pointsEarned }
+          }))
 
-        setPlayers(prev => prev.map(p =>
-          p.id === playerId
-            ? { ...p, score: (p.score || 0) + pointsEarned }
-            : p
-        ))
-      })
-      .on('broadcast', { event: 'round_end' }, ({ payload }) => {
-        // We keep the current question visible so the reveal can be shown in BattleView
-        setTimeout(() => {
+          setPlayers(prev => prev.map(p =>
+            p.id === playerId
+              ? { ...p, score: (p.score || 0) + pointsEarned }
+              : p
+          ))
+        })
+        .on('broadcast', { event: 'round_end' }, ({ payload }) => {
+          // We keep the current question visible so the reveal can be shown in BattleView
+          setTimeout(() => {
+            setCurrentQuestion(null)
+            if (!payload.isLast) {
+              broadcastEvent(roomId, 'next_round', { round: payload.nextRound })
+            }
+          }, 3000)
+        })
+        .on('broadcast', { event: 'game_end' }, ({ payload }) => {
+          setGameState(GAME_STATES.FINISHED)
           setCurrentQuestion(null)
-          if (!payload.isLast) {
-            broadcastEvent(roomId, 'next_round', { round: payload.nextRound })
+          if (roundTimerRef.current) {
+            clearTimeout(roundTimerRef.current)
           }
-        }, 3000)
-      })
-      .on('broadcast', { event: 'game_end' }, ({ payload }) => {
-        setGameState(GAME_STATES.FINISHED)
-        setCurrentQuestion(null)
-        if (roundTimerRef.current) {
-          clearTimeout(roundTimerRef.current)
-        }
 
-        // Synchronize final scores from broadcast
-        if (payload.finalScores) {
-          setPlayers(prev => prev.map(p => ({
-            ...p,
-            score: payload.finalScores[p.id] !== undefined ? payload.finalScores[p.id] : p.score
-          })))
+          // Synchronize final scores from broadcast
+          if (payload.finalScores) {
+            setPlayers(prev => prev.map(p => ({
+              ...p,
+              score: payload.finalScores[p.id] !== undefined ? payload.finalScores[p.id] : p.score
+            })))
 
-          // Update stats for non-host players who receive this broadcast
-          if (user) {
-            const myScore = payload.finalScores[user.id] || 0
-            const scoresArray = Object.values(payload.finalScores)
-            const maxScore = Math.max(...scoresArray, 0)
-            const isWinner = myScore === maxScore && myScore > 0
+            // Update stats for non-host players who receive this broadcast
+            if (user) {
+              const myScore = payload.finalScores[user.id] || 0
+              const scoresArray = Object.values(payload.finalScores)
+              const maxScore = Math.max(...scoresArray, 0)
+              const isWinner = myScore === maxScore && myScore > 0
 
-            supabase.rpc('update_player_stats', {
-              p_user_id: user.id,
-              p_games: 1,
-              p_wins: isWinner ? 1 : 0,
-              p_score: myScore
-            }).catch(err => console.error('Error updating player stats:', err))
+              supabase.rpc('update_player_stats', {
+                p_user_id: user.id,
+                p_games: 1,
+                p_wins: isWinner ? 1 : 0,
+                p_score: myScore
+              }).catch(err => console.error('Error updating player stats:', err))
+            }
           }
-        }
-      })
-      .on('broadcast', { event: 'rematch' }, () => {
-        resetGame()
-        toast('Rematch starting soon!', { icon: '🎮' })
-      })
-      .subscribe()
+        })
+        .on('broadcast', { event: 'rematch' }, () => {
+          resetGame()
+          toast('Rematch starting soon!', { icon: '🎮' })
+        })
+        .subscribe()
 
-    setRoomChannel(channel)
-    return channel
-  }, [])
+      setRoomChannel(channel)
+      return channel
+    } catch (err) {
+      console.error('Error subscribing to room:', err)
+      return null
+    }
+  }, [user, broadcastEvent, resetGame])
 
   const broadcastEvent = useCallback(async (roomId, event, payload) => {
     if (!roomChannel) {
@@ -220,34 +226,40 @@ export function GameProvider({ children }) {
   const joinRoom = async (code) => {
     if (!user || !profile) return null
 
-    const { data: room, error } = await supabase
-      .from('rooms')
-      .select('*, host:profiles!rooms_host_id_fkey(*)')
-      .eq('code', code.toUpperCase())
-      .single()
+    try {
+      const { data: room, error } = await supabase
+        .from('rooms')
+        .select('*, host:profiles!rooms_host_id_fkey(*)')
+        .eq('code', code.toUpperCase())
+        .single()
 
-    if (error || !room) {
-      throw new Error('Room not found')
-    }
+      if (error || !room) {
+        throw new Error('Room not found')
+      }
 
-    if (room.status !== GAME_STATES.WAITING) {
-      throw new Error('Game already in progress')
-    }
+      if (room.status !== GAME_STATES.WAITING) {
+        throw new Error('Game already in progress')
+      }
 
-    // Check if already in room
-    const { data: existingPlayer } = await supabase
-      .from('room_players')
-      .select('*')
-      .eq('room_id', room.id)
-      .eq('player_id', user.id)
-      .maybeSingle()
-
-    if (!existingPlayer) {
-      await supabase
+      // Check if already in room
+      const { data: existingPlayer, error: checkError } = await supabase
         .from('room_players')
-        .insert([{
-          room_id: room.id,
-          player_id: user.id,
+        .select('*')
+        .eq('room_id', room.id)
+        .eq('player_id', user.id)
+        .maybeSingle()
+
+      if (checkError) {
+        console.error('Error checking player in room:', checkError)
+        throw new Error('Failed to check room status')
+      }
+
+      if (!existingPlayer) {
+        const { error: insertError } = await supabase
+          .from('room_players')
+          .insert([{
+            room_id: room.id,
+            player_id: user.id,
           score: 0
         }])
     }
@@ -269,10 +281,14 @@ export function GameProvider({ children }) {
     })
 
     // Fetch existing players
-    const { data: roomPlayers } = await supabase
+    const { data: roomPlayers, error: playersError } = await supabase
       .from('room_players')
       .select('*, player:profiles(*)')
       .eq('room_id', room.id)
+
+    if (playersError) {
+      console.error('Error fetching room players:', playersError)
+    }
 
     if (roomPlayers) {
       setPlayers(roomPlayers.map(rp => ({
@@ -291,11 +307,15 @@ export function GameProvider({ children }) {
       setCurrentRound(room.current_round || 1)
 
       // Fetch session questions to ensure consistency
-      const { data: sessionQuestions } = await supabase
+      const { data: sessionQuestions, error: sessionsError } = await supabase
         .from('game_sessions')
         .select('*, question:questions(*)')
         .eq('room_id', room.id)
         .order('round_number', { ascending: true })
+
+      if (sessionsError) {
+        console.error('Error fetching game sessions:', sessionsError)
+      }
 
       if (sessionQuestions && sessionQuestions.length > 0) {
         const questions = sessionQuestions.map(sq => sq.question)
@@ -308,6 +328,10 @@ export function GameProvider({ children }) {
     }
 
     return room
+    } catch (err) {
+      console.error('Unexpected error joining room:', err)
+      throw err
+    }
   }
 
   const leaveRoom = async () => {
