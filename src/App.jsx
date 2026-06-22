@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import React, { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -7,17 +7,17 @@ import { Header, BottomNav } from './components/layout'
 import { LoadingSpinner } from './components/ui'
 
 // Pages
-const Landing = lazy(() => import('./pages/Landing').then(module => ({ default: module.Landing })))
-const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })))
-const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })))
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then(module => ({ default: module.ForgotPassword })))
-const ResetPassword = lazy(() => import('./pages/ResetPassword').then(module => ({ default: module.ResetPassword })))
-const Lobby = lazy(() => import('./pages/Lobby').then(module => ({ default: module.Lobby })))
-const Room = lazy(() => import('./pages/Room').then(module => ({ default: module.Room })))
-const Leaderboard = lazy(() => import('./pages/Leaderboard').then(module => ({ default: module.Leaderboard })))
-const Friends = lazy(() => import('./pages/Friends').then(module => ({ default: module.Friends })))
-const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })))
-const Admin = lazy(() => import('./pages/Admin').then(module => ({ default: module.Admin })))
+const Landing = lazy(() => import('./pages/Landing'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Lobby = lazy(() => import('./pages/Lobby'))
+const Room = lazy(() => import('./pages/Room'))
+const Leaderboard = lazy(() => import('./pages/Leaderboard'))
+const Friends = lazy(() => import('./pages/Friends'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Admin = lazy(() => import('./pages/Admin'))
 
 // Components
 import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
@@ -40,6 +40,40 @@ function ProtectedRoute({ children }) {
   }
 
   return children
+}
+
+// Error Boundary
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    console.error('[v0] Error caught by boundary:', error)
+    return { hasError: true, error }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <div className="max-w-md">
+            <h1 className="text-2xl font-bold text-danger mb-4">Something went wrong</h1>
+            <p className="text-slate-400 mb-4">{this.state.error?.message}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-white rounded"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
 }
 
 // App Content with Auth-aware layout
@@ -118,36 +152,38 @@ function AppContent() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <GameProvider>
-          <AppContent />
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              style: {
-                background: '#1E293B',
-                color: '#F8FAFC',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                padding: '12px 16px',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#10B981',
-                  secondary: '#F8FAFC',
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <GameProvider>
+            <AppContent />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: '#1E293B',
+                  color: '#F8FAFC',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
                 },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#EF4444',
-                  secondary: '#F8FAFC',
+                success: {
+                  iconTheme: {
+                    primary: '#10B981',
+                    secondary: '#F8FAFC',
+                  },
                 },
-              },
-            }}
-          />
-        </GameProvider>
-      </AuthProvider>
-    </BrowserRouter>
+                error: {
+                  iconTheme: {
+                    primary: '#EF4444',
+                    secondary: '#F8FAFC',
+                  },
+                },
+              }}
+            />
+          </GameProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }

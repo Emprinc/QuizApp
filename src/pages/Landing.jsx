@@ -6,7 +6,7 @@ import { Button, Card, Avatar } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { useState, useEffect } from 'react'
 
-export function Landing() {
+export default function Landing() {
   const { user, profile } = useAuth()
   const [stats, setStats] = useState({ gamesPlayed: 0, totalPlayers: 0, questionsAnswered: 0, onlinePlayers: 0 })
   const [recentGames, setRecentGames] = useState([])

@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { Button, Card } from '../components/ui'
 import toast from 'react-hot-toast'
 
-export function ForgotPassword() {
+export default function ForgotPassword() {
   const navigate = useNavigate()
   const { resetPassword } = useAuth()
   const [loading, setLoading] = useState(false)
