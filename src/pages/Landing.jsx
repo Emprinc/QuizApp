@@ -23,15 +23,22 @@ export function Landing() {
     // Fetch recent games
     const fetchRecentGames = async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('rooms')
           .select('*, players:room_players(count)')
           .order('created_at', { ascending: false })
           .limit(5)
 
+        if (error) {
+          console.error('Error fetching recent games:', error)
+          setRecentGames([])
+          return
+        }
+
         if (data) setRecentGames(data)
       } catch (err) {
-        // Silent fail for visitors
+        console.error('Unexpected error fetching recent games:', err)
+        setRecentGames([])
       }
     }
 
@@ -39,35 +46,41 @@ export function Landing() {
     const fetchGlobalStats = async () => {
       try {
         // Total players
-        const { count: profileCount } = await supabase
+        const { count: profileCount, error: profileError } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
 
-        if (profileCount !== null) {
+        if (profileError) {
+          console.error('Error fetching profile count:', profileError)
+        } else if (profileCount !== null) {
           setStats(prev => ({ ...prev, totalPlayers: profileCount }))
         }
 
         // Questions count
-        const { count: questionCount } = await supabase
+        const { count: questionCount, error: questionError } = await supabase
           .from('questions')
           .select('*', { count: 'exact', head: true })
 
-        if (questionCount !== null) {
+        if (questionError) {
+          console.error('Error fetching question count:', questionError)
+        } else if (questionCount !== null) {
           setStats(prev => ({ ...prev, questionsAnswered: questionCount }))
         }
 
         // Online players (using exact count on last_seen)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-        const { count: onlineCount } = await supabase
+        const { count: onlineCount, error: onlineError } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .gt('last_seen', fiveMinutesAgo)
 
-        if (onlineCount !== null) {
+        if (onlineError) {
+          console.error('Error fetching online count:', onlineError)
+        } else if (onlineCount !== null) {
           setStats(prev => ({ ...prev, onlinePlayers: onlineCount }))
         }
       } catch (err) {
-        // Silent fail for visitors
+        console.error('Unexpected error fetching global stats:', err)
       }
     }
 

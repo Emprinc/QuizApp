@@ -65,7 +65,7 @@ export function Room() {
     if (isHost) {
       try {
         // Reset room status and round in DB
-        await supabase
+        const { error: roomError } = await supabase
           .from('rooms')
           .update({
             status: GAME_STATES.WAITING,
@@ -73,8 +73,14 @@ export function Room() {
           })
           .eq('id', currentRoom.id)
 
+        if (roomError) {
+          console.error('Error updating room status:', roomError)
+          toast.error('Failed to reset room')
+          return
+        }
+
         // Reset player scores in DB
-        await supabase
+        const { error: playersError } = await supabase
           .from('room_players')
           .update({
             score: 0,
@@ -82,13 +88,23 @@ export function Room() {
           })
           .eq('room_id', currentRoom.id)
 
+        if (playersError) {
+          console.error('Error resetting player scores:', playersError)
+          toast.error('Failed to reset scores')
+          return
+        }
+
         // Broadcast rematch to all players
         if (roomChannel) {
-          roomChannel.send({
-            type: 'broadcast',
-            event: 'rematch',
-            payload: {}
-          })
+          try {
+            await roomChannel.send({
+              type: 'broadcast',
+              event: 'rematch',
+              payload: {}
+            })
+          } catch (err) {
+            console.error('Error broadcasting rematch:', err)
+          }
         }
 
         // Host manually resets local state
@@ -96,6 +112,7 @@ export function Room() {
         setShowReview(false)
         toast.success('Room reset for rematch!')
       } catch (err) {
+        console.error('Unexpected error in handlePlayAgain:', err)
         toast.error('Failed to reset game')
       }
     } else {
