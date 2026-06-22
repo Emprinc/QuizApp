@@ -16,6 +16,11 @@ export function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    if (!password || !confirmPassword) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
     if (password !== confirmPassword) {
       toast.error('Passwords do not match')
       return
@@ -33,7 +38,13 @@ export function ResetPassword() {
       toast.success('Password updated successfully!')
       navigate('/login')
     } catch (error) {
-      toast.error(error.message || 'Failed to update password')
+      // Handle token expiration
+      if (error.message?.includes('invalid') || error.message?.includes('expired')) {
+        toast.error('This reset link has expired. Please request a new one.')
+        navigate('/forgot-password')
+      } else {
+        toast.error(error.message || 'Failed to update password')
+      }
     } finally {
       setLoading(false)
     }

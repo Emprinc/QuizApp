@@ -4,11 +4,18 @@ import { Zap, Trophy, Users, User, LogOut, Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useState } from 'react'
 import { Avatar } from '../ui'
+import toast from 'react-hot-toast'
 
 export function Header() {
   const { user, profile, signOut } = useAuth()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to sign out?')) {
+      signOut()
+    }
+  }
 
   const navItems = [
     { path: '/', label: 'Home', icon: Zap },
@@ -66,7 +73,7 @@ export function Header() {
                   </span>
                 </Link>
                 <button
-                  onClick={signOut}
+                  onClick={handleLogout}
                   className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
                   title="Sign out"
                 >

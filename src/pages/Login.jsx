@@ -17,6 +17,19 @@ export function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // Validation
+    if (!formData.email || !formData.password) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
     setLoading(true)
 
     try {

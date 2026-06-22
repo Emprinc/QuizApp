@@ -20,6 +20,23 @@ export function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    // Validation
+    if (!formData.username || !formData.email || !formData.password || !formData.confirmPassword) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    if (formData.username.length < 3) {
+      toast.error('Username must be at least 3 characters')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match')
       return

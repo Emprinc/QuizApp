@@ -48,6 +48,13 @@ export function Room() {
     }
   }, [code, currentRoom, joinRoom, navigate])
 
+  // Scroll to top when game finishes
+  useEffect(() => {
+    if (gameState === GAME_STATES.FINISHED) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [gameState])
+
   const copyInviteLink = () => {
     const link = `${window.location.origin}/join/${code}`
     navigator.clipboard.writeText(link)
@@ -57,6 +64,8 @@ export function Room() {
   }
 
   const handleLeave = async () => {
+    setShowReview(false)
+    setReviewQuestions([])
     await leaveRoom()
     navigate('/lobby')
   }

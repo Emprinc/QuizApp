@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, ArrowLeft, Zap } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -7,6 +7,7 @@ import { Button, Card } from '../components/ui'
 import toast from 'react-hot-toast'
 
 export function ForgotPassword() {
+  const navigate = useNavigate()
   const { resetPassword } = useAuth()
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
@@ -14,6 +15,18 @@ export function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!email.trim()) {
+      toast.error('Please enter your email')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -62,9 +75,14 @@ export function ForgotPassword() {
               <p className="text-slate-400 mb-6">
                 We've sent a password reset link to <span className="text-white font-medium">{email}</span>.
               </p>
-              <Button variant="secondary" className="w-full" onClick={() => setSubmitted(false)}>
-                Try another email
-              </Button>
+              <div className="space-y-3">
+                <Button variant="secondary" className="w-full" onClick={() => setSubmitted(false)}>
+                  Try another email
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => navigate('/login')}>
+                  Back to login
+                </Button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">

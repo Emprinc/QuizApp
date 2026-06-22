@@ -335,31 +335,48 @@ export function GameProvider({ children }) {
   }
 
   const leaveRoom = async () => {
-    if (currentRoom && user) {
-      broadcastEvent(currentRoom.id, 'player_left', { playerId: user.id })
+    try {
+      if (currentRoom && user) {
+        try {
+          await broadcastEvent(currentRoom.id, 'player_left', { playerId: user.id })
+        } catch (err) {
+          console.warn('Error broadcasting player_left:', err)
+        }
 
-      // Only delete from room_players if game hasn't started
-      // This preserves history for finished games
-      if (currentRoom.status === GAME_STATES.WAITING) {
-        await supabase
-          .from('room_players')
-          .delete()
-          .eq('room_id', currentRoom.id)
-          .eq('player_id', user.id)
-      }
+        // Only delete from room_players if game hasn't started
+        // This preserves history for finished games
+        if (currentRoom.status === GAME_STATES.WAITING) {
+          const { error } = await supabase
+            .from('room_players')
+            .delete()
+            .eq('room_id', currentRoom.id)
+            .eq('player_id', user.id)
 
-      if (roomChannel) {
-        roomChannel.unsubscribe()
-        setRoomChannel(null)
+          if (error) {
+            console.error('Error removing player from room:', error)
+          }
+        }
+
+        if (roomChannel) {
+          try {
+            roomChannel.unsubscribe()
+          } catch (err) {
+            console.warn('Error unsubscribing from room channel:', err)
+          }
+          setRoomChannel(null)
+        }
       }
+    } catch (err) {
+      console.error('Unexpected error in leaveRoom:', err)
+    } finally {
+      // Always reset state even if errors occur
+      setCurrentRoom(null)
+      setPlayers([])
+      setCurrentQuestion(null)
+      setCurrentRound(0)
+      setGameState(GAME_STATES.WAITING)
+      setAnswers({})
     }
-
-    setCurrentRoom(null)
-    setPlayers([])
-    setCurrentQuestion(null)
-    setCurrentRound(0)
-    setGameState(GAME_STATES.WAITING)
-    setAnswers({})
   }
 
   const startGame = async () => {
