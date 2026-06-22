@@ -83,6 +83,12 @@ export function Lobby() {
     try {
       const room = await createRoom(createForm.category, createForm.questionCount, createForm.timePerQuestion)
       if (room) {
+        // Reset form
+        setCreateForm({
+          category: CATEGORIES[0].id,
+          questionCount: 10,
+          timePerQuestion: 15
+        })
         setShowCreateModal(false)
         toast.success('Room created!')
         navigate(`/room/${room.code}`)
@@ -104,6 +110,8 @@ export function Lobby() {
     try {
       const room = await joinRoom(joinCode.trim())
       if (room) {
+        // Reset form
+        setJoinCode('')
         setShowJoinModal(false)
         toast.success('Joined room!')
         navigate(`/room/${room.code}`)
