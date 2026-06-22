@@ -30,7 +30,8 @@ export function Leaderboard() {
     if (user) {
       fetchUserRank()
     }
-  }, [activeTab, period, page])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, period, page, user?.id])
 
   const fetchUserRank = async () => {
     const { data, error } = await supabase.rpc('get_user_rank', { p_user_id: user.id })
@@ -55,9 +56,21 @@ export function Leaderboard() {
       }
 
       const { data, error } = await query.range((page - 1) * limit, page * limit - 1)
-      if (data) setRankings(data)
+      
+      if (error) {
+        console.error('Error fetching rankings:', error)
+        setRankings([])
+        return
+      }
+
+      if (data) {
+        setRankings(data)
+      } else {
+        setRankings([])
+      }
     } catch (err) {
       console.error('Error fetching rankings:', err)
+      setRankings([])
     } finally {
       setLoading(false)
     }
@@ -79,9 +92,20 @@ export function Leaderboard() {
         .order('joined_at', { ascending: false })
         .limit(20)
 
-      if (data) setGameHistory(data)
+      if (error) {
+        console.error('Error fetching history:', error)
+        setGameHistory([])
+        return
+      }
+
+      if (data) {
+        setGameHistory(data)
+      } else {
+        setGameHistory([])
+      }
     } catch (err) {
       console.error('Error fetching history:', err)
+      setGameHistory([])
     } finally {
       setLoading(false)
     }
@@ -90,28 +114,42 @@ export function Leaderboard() {
   const fetchFriends = async () => {
     setLoading(true)
     try {
-      const { data: friendsData } = await supabase
+      const { data: friendsData, error: friendsError } = await supabase
         .from('friendships')
         .select('sender_id, receiver_id')
         .eq('status', 'accepted')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+
+      if (friendsError) {
+        console.error('Error fetching friendships:', friendsError)
+        setFriends([])
+        return
+      }
 
       const friendIds = friendsData ? friendsData.map(f =>
         f.sender_id === user.id ? f.receiver_id : f.sender_id
       ) : []
 
       if (friendIds.length > 0) {
-        const { data } = await supabase
+        const { data, error: profilesError } = await supabase
           .from('profiles')
           .select('*')
           .in('id', friendIds)
           .order('total_score', { ascending: false })
+
+        if (profilesError) {
+          console.error('Error fetching friend profiles:', profilesError)
+          setFriends([])
+          return
+        }
+
         setFriends(data || [])
       } else {
         setFriends([])
       }
     } catch (err) {
       console.error('Error fetching friends:', err)
+      setFriends([])
     } finally {
       setLoading(false)
     }

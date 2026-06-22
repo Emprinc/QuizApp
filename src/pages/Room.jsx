@@ -138,20 +138,40 @@ export function Room() {
 
   const handleShowReview = async () => {
     try {
+      // Fetch only questions from the current game session, not all historical answers
+      const { data: sessionQuestions, error: sessionError } = await supabase
+        .from('game_sessions')
+        .select('question_id')
+        .eq('room_id', currentRoom.id)
+        .order('round_number', { ascending: true })
+
+      if (sessionError) throw sessionError
+
+      if (!sessionQuestions || sessionQuestions.length === 0) {
+        toast.error('No questions found for this game')
+        return
+      }
+
+      // Get player answers for only these specific questions
+      const questionIds = sessionQuestions.map(sq => sq.question_id)
       const { data: answers, error } = await supabase
         .from('player_answers')
         .select('*, question:questions(*)')
         .eq('room_id', currentRoom.id)
         .eq('player_id', user.id)
+        .in('question_id', questionIds)
         .order('created_at', { ascending: true })
 
       if (error) throw error
 
-      if (answers) {
+      if (answers && answers.length > 0) {
         setReviewQuestions(answers)
         setShowReview(true)
+      } else {
+        toast.error('No answers found for this game')
       }
     } catch (err) {
+      console.error('Review load error:', err)
       toast.error('Failed to load review')
     }
   }

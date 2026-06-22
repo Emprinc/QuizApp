@@ -212,18 +212,27 @@ export function AuthProvider({ children }) {
   }
 
   const updateProfile = async (updates) => {
-    if (!user) return
+    if (!user) {
+      throw new Error('User not authenticated')
+    }
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', user.id)
-      .select()
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', user.id)
+        .select()
+        .single()
 
-    if (error) throw error
-    setProfile(data)
-    return data
+      if (error) throw error
+      if (!data) throw new Error('Profile update returned no data')
+      
+      setProfile(data)
+      return data
+    } catch (err) {
+      console.error('Profile update error:', err)
+      throw err
+    }
   }
 
   const updateLastSeen = async () => {

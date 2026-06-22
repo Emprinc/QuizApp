@@ -459,53 +459,64 @@ export function GameProvider({ children }) {
   const submitAnswer = async (answerIndex, timeTaken) => {
     if (!currentRoom || !user || !currentQuestion) return
 
-    const isCorrect = answerIndex === currentQuestion.correctAnswer
-    const timeBonus = Math.max(
-      0,
-      100 - Math.floor((timeTaken / 1000) * 8)
-    )
-    const pointsEarned = isCorrect ? 100 + timeBonus : 0
+    try {
+      const isCorrect = answerIndex === currentQuestion.correctAnswer
+      const timeBonus = Math.max(
+        0,
+        100 - Math.floor((timeTaken / 1000) * 8)
+      )
+      const pointsEarned = isCorrect ? 100 + timeBonus : 0
 
-    // Record answer
-    const { error } = await supabase
-      .from('player_answers')
-      .insert([{
-        player_id: user.id,
-        room_id: currentRoom.id,
-        question_id: currentQuestion.id,
+      // Record answer with error handling
+      const { error: answerError } = await supabase
+        .from('player_answers')
+        .insert([{
+          player_id: user.id,
+          room_id: currentRoom.id,
+          question_id: currentQuestion.id,
+          answer: answerIndex,
+          is_correct: isCorrect,
+          time_taken_ms: timeTaken,
+          score_earned: pointsEarned
+        }])
+
+      if (answerError) {
+        console.error('Error recording answer:', answerError)
+        return
+      }
+
+      // Update room_players score for persistence across refreshes
+      const currentPlayer = players.find(p => p.id === user.id)
+      const newScore = (currentPlayer?.score || 0) + pointsEarned
+
+      const { error: updateError } = await supabase
+        .from('room_players')
+        .update({
+          score: newScore,
+          answers_correct: isCorrect ? (currentPlayer?.answers_correct || 0) + 1 : (currentPlayer?.answers_correct || 0)
+        })
+        .eq('room_id', currentRoom.id)
+        .eq('player_id', user.id)
+
+      if (updateError) {
+        console.error('Error updating room_players:', updateError)
+      }
+
+      setAnswers(prev => ({
+        ...prev,
+        [user.id]: { answer: answerIndex, isCorrect, timeTaken, pointsEarned }
+      }))
+
+      broadcastEvent(currentRoom.id, 'answer_result', {
+        playerId: user.id,
         answer: answerIndex,
-        is_correct: isCorrect,
-        time_taken_ms: timeTaken,
-        score_earned: pointsEarned
-      }])
-
-    if (error) console.error('Error recording answer:', error)
-
-    // Update room_players score for persistence across refreshes
-    const currentPlayer = players.find(p => p.id === user.id)
-    const newScore = (currentPlayer?.score || 0) + pointsEarned
-
-    await supabase
-      .from('room_players')
-      .update({
-        score: newScore,
-        answers_correct: isCorrect ? (currentPlayer?.answers_correct || 0) + 1 : (currentPlayer?.answers_correct || 0)
+        isCorrect,
+        timeTaken,
+        pointsEarned
       })
-      .eq('room_id', currentRoom.id)
-      .eq('player_id', user.id)
-
-    setAnswers(prev => ({
-      ...prev,
-      [user.id]: { answer: answerIndex, isCorrect, timeTaken, pointsEarned }
-    }))
-
-    broadcastEvent(currentRoom.id, 'answer_result', {
-      playerId: user.id,
-      answer: answerIndex,
-      isCorrect,
-      timeTaken,
-      pointsEarned
-    })
+    } catch (err) {
+      console.error('Unexpected error submitting answer:', err)
+    }
   }
 
   const endRound = (roundNumber) => {
@@ -538,21 +549,31 @@ export function GameProvider({ children }) {
 
     if (currentRoom) {
       try {
-        await supabase
+        // Update room status to finished
+        const { error: statusError } = await supabase
           .from('rooms')
           .update({ status: GAME_STATES.FINISHED })
           .eq('id', currentRoom.id)
+
+        if (statusError) {
+          console.error('Error updating room status:', statusError)
+        }
 
         // Update currentRoom status locally for leaveRoom logic
         setCurrentRoom(prev => prev ? { ...prev, status: GAME_STATES.FINISHED } : null)
 
         // Fetch final scores to ensure synchronization
-        const { data: finalPlayers } = await supabase
+        const { data: finalPlayers, error: fetchError } = await supabase
           .from('room_players')
           .select('*, player:profiles(*)')
           .eq('room_id', currentRoom.id)
 
-        if (finalPlayers) {
+        if (fetchError) {
+          console.error('Error fetching final players:', fetchError)
+          return
+        }
+
+        if (finalPlayers && finalPlayers.length > 0) {
           const mappedPlayers = finalPlayers.map(rp => ({
             id: rp.player_id,
             username: rp.player?.username || 'Unknown',
@@ -576,12 +597,16 @@ export function GameProvider({ children }) {
             const maxScore = Math.max(...scoresArray, 0)
             const isWinner = myScore === maxScore && myScore > 0
 
-            await supabase.rpc('update_player_stats', {
+            const { error: statsError } = await supabase.rpc('update_player_stats', {
               p_user_id: user.id,
               p_games: 1,
               p_wins: isWinner ? 1 : 0,
               p_score: myScore
             })
+
+            if (statsError) {
+              console.error('Error updating player stats:', statsError)
+            }
           }
         }
       } catch (err) {

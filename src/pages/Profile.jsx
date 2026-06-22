@@ -47,7 +47,8 @@ export function Profile() {
     if (user) {
       fetchHistory()
     }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const fetchHistory = async () => {
     try {
