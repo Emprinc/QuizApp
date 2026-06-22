@@ -49,19 +49,32 @@ export function Lobby() {
   }, [])
 
   const fetchActiveRooms = async () => {
-    const { data } = await supabase
-      .from('rooms')
-      .select(`
-        *,
-        host:profiles!rooms_host_id_fkey(username, avatar_url),
-        players:room_players(count)
-      `)
-      .eq('status', 'waiting')
-      .order('created_at', { ascending: false })
-      .limit(20)
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select(`
+          *,
+          host:profiles!rooms_host_id_fkey(username, avatar_url),
+          players:room_players(count)
+        `)
+        .eq('status', 'waiting')
+        .order('created_at', { ascending: false })
+        .limit(20)
 
-    if (data) {
-      setActiveRooms(data)
+      if (error) {
+        console.error('Error fetching active rooms:', error)
+        setActiveRooms([])
+        return
+      }
+
+      if (data) {
+        setActiveRooms(data)
+      } else {
+        setActiveRooms([])
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching rooms:', err)
+      setActiveRooms([])
     }
   }
 
