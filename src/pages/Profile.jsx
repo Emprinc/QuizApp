@@ -182,20 +182,27 @@ export function Profile() {
                         return
                       }
 
-                      const reader = new FileReader()
-                      reader.onloadend = async () => {
-                        try {
-                          setSaving(true)
-                          const dataUrl = reader.result
-                          await updateProfile({ avatar_url: dataUrl })
-                          toast.success('Avatar updated!')
-                        } catch (err) {
-                          toast.error('Failed to update avatar')
-                        } finally {
-                          setSaving(false)
+                      try {
+                        setSaving(true)
+                        // For now, store as data URL since no blob storage configured
+                        // Production: upload to Vercel Blob or Supabase Storage
+                        const reader = new FileReader()
+                        reader.onloadend = async () => {
+                          try {
+                            const dataUrl = reader.result
+                            await updateProfile({ avatar_url: dataUrl })
+                            toast.success('Avatar updated!')
+                          } catch (err) {
+                            toast.error('Failed to update avatar')
+                          } finally {
+                            setSaving(false)
+                          }
                         }
+                        reader.readAsDataURL(file)
+                      } catch (err) {
+                        toast.error('Failed to process image')
+                        setSaving(false)
                       }
-                      reader.readAsDataURL(file)
                     }}
                   />
                 </label>

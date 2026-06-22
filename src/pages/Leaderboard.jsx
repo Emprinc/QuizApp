@@ -264,15 +264,17 @@ export function Leaderboard() {
                 ))}
 
                 {/* Pagination */}
-                <div className="flex items-center justify-center gap-4 mt-8">
-                  <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <span className="text-slate-400 text-sm">Page {page}</span>
-                  <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={rankings.length < limit}>
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
+                {rankings.length > 0 && (
+                  <div className="flex items-center justify-center gap-4 mt-8">
+                    <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-slate-400 text-sm">Page {page}</span>
+                    <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={rankings.length < limit}>
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

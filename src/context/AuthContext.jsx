@@ -244,7 +244,7 @@ export function AuthProvider({ children }) {
       const interval = setInterval(updateLastSeen, 2 * 60 * 1000) // Every 2 minutes
       return () => clearInterval(interval)
     }
-  }, [user])
+  }, [user, updateLastSeen])
 
   return (
     <AuthContext.Provider value={{

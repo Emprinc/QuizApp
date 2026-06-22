@@ -45,10 +45,14 @@ function ProtectedRoute({ children }) {
 // App Content with Auth-aware layout
 function AppContent() {
   const { user } = useAuth()
+  
+  // Memoize header/footer to prevent unnecessary re-renders
+  const headerElement = user ? <Header /> : null
+  const bottomNavElement = user ? <BottomNav /> : null
 
   return (
     <div className="min-h-screen bg-background">
-      {user && <Header />}
+      {headerElement}
       <Suspense fallback={
         <div className="min-h-[80vh] flex items-center justify-center">
           <LoadingSpinner size="lg" />
@@ -107,7 +111,7 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-      {user && <BottomNav />}
+      {bottomNavElement}
     </div>
   )
 }

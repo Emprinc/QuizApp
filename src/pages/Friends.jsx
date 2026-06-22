@@ -65,13 +65,16 @@ export function Friends() {
     if (!searchEmail.trim()) return
 
     setSearching(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('email', searchEmail.trim())
-      .single()
+      .maybeSingle()
 
-    if (data && data.id !== user?.id) {
+    if (error) {
+      toast.error('Search failed')
+      setSearchResult(null)
+    } else if (data && data.id !== user?.id) {
       setSearchResult(data)
     } else if (data && data.id === user?.id) {
       toast.error("That's you!")
