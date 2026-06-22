@@ -7,7 +7,7 @@ import { Card, Avatar, Button, EmptyState, LoadingSpinner, Modal, Input } from '
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-export function Friends() {
+export default function Friends() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const [friends, setFriends] = useState([])

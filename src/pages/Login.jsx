@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { Button, Input, Card } from '../components/ui'
 import toast from 'react-hot-toast'
 
-export function Login() {
+export default function Login() {
   const navigate = useNavigate()
   const { signIn, signInWithGoogle } = useAuth()
   const [loading, setLoading] = useState(false)

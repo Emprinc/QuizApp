@@ -50,6 +50,40 @@ export function GameProvider({ children }) {
     }
   }, [roomChannel])
 
+  const broadcastEventRef = useRef(null)
+  const resetGameRef = useRef(null)
+
+  const broadcastEvent = useCallback(async (roomId, event, payload) => {
+    if (!roomChannel) {
+      console.warn(`Cannot broadcast ${event}: channel not initialized`)
+      return
+    }
+
+    try {
+      // Wait for channel to be fully joined before sending
+      if (roomChannel.state !== 'joined') {
+        // Give it a brief moment to join
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      if (roomChannel.state === 'joined') {
+        await roomChannel.send({
+          type: 'broadcast',
+          event,
+          payload: { ...payload, timestamp: Date.now() }
+        })
+      } else {
+        console.warn(`Cannot broadcast ${event}: channel in ${roomChannel.state} state`)
+      }
+    } catch (err) {
+      console.error(`Error broadcasting ${event}:`, err)
+    }
+  }, [roomChannel])
+
+  useEffect(() => {
+    broadcastEventRef.current = broadcastEvent
+  }, [broadcastEvent])
+
   const subscribeToRoom = useCallback((roomId) => {
     try {
       // Cleanup existing subscription
@@ -104,8 +138,8 @@ export function GameProvider({ children }) {
           // We keep the current question visible so the reveal can be shown in BattleView
           setTimeout(() => {
             setCurrentQuestion(null)
-            if (!payload.isLast) {
-              broadcastEvent(roomId, 'next_round', { round: payload.nextRound })
+            if (!payload.isLast && broadcastEventRef.current) {
+              broadcastEventRef.current(roomId, 'next_round', { round: payload.nextRound })
             }
           }, 3000)
         })
@@ -140,7 +174,9 @@ export function GameProvider({ children }) {
           }
         })
         .on('broadcast', { event: 'rematch' }, () => {
-          resetGame()
+          if (resetGameRef.current) {
+            resetGameRef.current()
+          }
           toast('Rematch starting soon!', { icon: '🎮' })
         })
         .subscribe()
@@ -151,34 +187,7 @@ export function GameProvider({ children }) {
       console.error('Error subscribing to room:', err)
       return null
     }
-  }, [user, broadcastEvent, resetGame])
-
-  const broadcastEvent = useCallback(async (roomId, event, payload) => {
-    if (!roomChannel) {
-      console.warn(`Cannot broadcast ${event}: channel not initialized`)
-      return
-    }
-
-    try {
-      // Wait for channel to be fully joined before sending
-      if (roomChannel.state !== 'joined') {
-        // Give it a brief moment to join
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-
-      if (roomChannel.state === 'joined') {
-        await roomChannel.send({
-          type: 'broadcast',
-          event,
-          payload: { ...payload, timestamp: Date.now() }
-        })
-      } else {
-        console.warn(`Cannot broadcast ${event}: channel in ${roomChannel.state} state`)
-      }
-    } catch (err) {
-      console.error(`Error broadcasting ${event}:`, err)
-    }
-  }, [roomChannel])
+  }, [user])
 
   const createRoom = async (category, questionCount, timePerQuestion) => {
     if (!user || !profile) return null
@@ -664,6 +673,10 @@ export function GameProvider({ children }) {
     setPlayers(prev => prev.map(p => ({ ...p, score: 0, answers_correct: 0 })))
     setAnswers({})
   }, [])
+
+  useEffect(() => {
+    resetGameRef.current = resetGame
+  }, [resetGame])
 
   const getInviteLink = () => {
     if (!currentRoom) return ''

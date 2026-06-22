@@ -6,7 +6,7 @@ import { Card, Avatar, Button, Input, LoadingSpinner } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-export function Profile() {
+export default function Profile() {
   const { user, profile, signOut, updateProfile } = useAuth()
   const [editing, setEditing] = useState(false)
   const [username, setUsername] = useState(profile?.username || '')

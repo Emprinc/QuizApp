@@ -6,7 +6,7 @@ import { Card, Avatar, EmptyState, LoadingSpinner, Button } from '../components/
 import { supabase } from '../lib/supabase'
 import { getRankColor } from '../lib/constants'
 
-export function Leaderboard() {
+export default function Leaderboard() {
   const { user, profile } = useAuth()
   const [rankings, setRankings] = useState([])
   const [loading, setLoading] = useState(true)

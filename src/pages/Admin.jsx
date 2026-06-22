@@ -9,7 +9,7 @@ const UserManager = lazy(() => import('../components/admin/UserManager').then(mo
 const RoomManager = lazy(() => import('../components/admin/RoomManager').then(module => ({ default: module.RoomManager })))
 const Analytics = lazy(() => import('../components/admin/Analytics').then(module => ({ default: module.Analytics })))
 
-export function Admin() {
+export default function Admin() {
   return (
     <AdminLayout>
       <Suspense fallback={

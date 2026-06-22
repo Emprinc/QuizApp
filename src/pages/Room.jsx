@@ -9,7 +9,7 @@ import { GAME_STATES, getRankColor } from '../lib/constants'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-export function Room() {
+export default function Room() {
   const { code } = useParams()
   const navigate = useNavigate()
   const { user, profile } = useAuth()

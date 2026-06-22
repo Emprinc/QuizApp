@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 
-export function Lobby() {
+export default function Lobby() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const { currentRoom, players, createRoom, joinRoom, leaveRoom } = useGame()
