@@ -46,7 +46,7 @@ export function Room() {
     return () => {
       // Cleanup on unmount
     }
-  }, [code])
+  }, [code, currentRoom, joinRoom, navigate])
 
   const copyInviteLink = () => {
     const link = `${window.location.origin}/join/${code}`
@@ -497,17 +497,23 @@ function BattleView() {
   }
 
   useEffect(() => {
-    if (!roomChannel) return
+    if (!roomChannel || !currentQuestion) return
 
     const handleRoundEnd = ({ payload }) => {
       setIsAnswerRevealed(true)
 
       // If we didn't have the correct answer locally (security), use the one from broadcast
-      if (currentQuestion && payload.correctAnswerIndex !== undefined) {
-        currentQuestion.correctAnswer = payload.correctAnswerIndex
+      if (payload.correctAnswerIndex !== undefined) {
+        setCurrentQuestion(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            correctAnswer: payload.correctAnswerIndex
+          }
+        })
       }
 
-      if (selectedAnswer !== null) {
+      if (selectedAnswer !== null && payload.correctAnswerIndex !== undefined) {
         const isCorrect = selectedAnswer === payload.correctAnswerIndex
         if (isCorrect) {
           // Show that they got it right; specific score was already handled in DB/context

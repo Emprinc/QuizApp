@@ -45,6 +45,7 @@ export function GameProvider({ children }) {
       }
       if (roundTimerRef.current) {
         clearTimeout(roundTimerRef.current)
+        roundTimerRef.current = null
       }
     }
   }, [roomChannel])
@@ -146,24 +147,30 @@ export function GameProvider({ children }) {
     return channel
   }, [])
 
-  const broadcastEvent = useCallback((roomId, event, payload) => {
-    if (roomChannel && (roomChannel.state === 'joined' || roomChannel.state === 'joining')) {
-      // If still joining, we might want to wait or just attempt send as it might succeed if it joins quickly
-      // but 'joined' is the safest. However, we'll keep the joined check.
+  const broadcastEvent = useCallback(async (roomId, event, payload) => {
+    if (!roomChannel) {
+      console.warn(`Cannot broadcast ${event}: channel not initialized`)
+      return
+    }
+
+    try {
+      // Wait for channel to be fully joined before sending
+      if (roomChannel.state !== 'joined') {
+        // Give it a brief moment to join
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
       if (roomChannel.state === 'joined') {
-        roomChannel.send({
+        await roomChannel.send({
           type: 'broadcast',
           event,
           payload: { ...payload, timestamp: Date.now() }
-        }).catch(err => {
-          console.error(`Error broadcasting ${event}:`, err)
         })
       } else {
-        // Queue or retry? For now, just log.
         console.warn(`Cannot broadcast ${event}: channel in ${roomChannel.state} state`)
       }
-    } else {
-      console.warn(`Cannot broadcast ${event}: channel not initialized or in bad state`, roomChannel?.state)
+    } catch (err) {
+      console.error(`Error broadcasting ${event}:`, err)
     }
   }, [roomChannel])
 
