@@ -10,6 +10,10 @@ export function Landing() {
   const { user, profile } = useAuth()
   const [stats, setStats] = useState({ gamesPlayed: 0, totalPlayers: 0, questionsAnswered: 0, onlinePlayers: 0 })
   const [recentGames, setRecentGames] = useState([])
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [gamesLoading, setGamesLoading] = useState(true)
+  const [statsError, setStatsError] = useState(null)
+  const [gamesError, setGamesError] = useState(null)
 
   useEffect(() => {
     // Fetch user-specific stats
@@ -19,9 +23,13 @@ export function Landing() {
         gamesPlayed: profile.total_games || 0
       }))
     }
+  }, [user?.id, profile?.total_games])
 
+  useEffect(() => {
     // Fetch recent games
     const fetchRecentGames = async () => {
+      setGamesLoading(true)
+      setGamesError(null)
       try {
         const { data, error } = await supabase
           .from('rooms')
@@ -31,62 +39,98 @@ export function Landing() {
 
         if (error) {
           console.error('Error fetching recent games:', error)
+          setGamesError('Failed to load recent games')
           setRecentGames([])
           return
         }
 
-        if (data) setRecentGames(data)
+        if (data) {
+          setRecentGames(data)
+          setGamesError(null)
+        } else {
+          setRecentGames([])
+        }
       } catch (err) {
         console.error('Unexpected error fetching recent games:', err)
+        setGamesError('Failed to load recent games')
         setRecentGames([])
+      } finally {
+        setGamesLoading(false)
       }
     }
 
     // Fetch global stats
     const fetchGlobalStats = async () => {
+      setStatsLoading(true)
+      setStatsError(null)
       try {
+        let profileCount = 0
+        let questionCount = 0
+        let onlineCount = 0
+        let hasError = false
+
         // Total players
-        const { count: profileCount, error: profileError } = await supabase
+        const { count: pCount, error: profileError } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
 
         if (profileError) {
           console.error('Error fetching profile count:', profileError)
-        } else if (profileCount !== null) {
-          setStats(prev => ({ ...prev, totalPlayers: profileCount }))
+          hasError = true
+        } else if (pCount !== null) {
+          profileCount = pCount
         }
 
         // Questions count
-        const { count: questionCount, error: questionError } = await supabase
+        const { count: qCount, error: questionError } = await supabase
           .from('questions')
           .select('*', { count: 'exact', head: true })
 
         if (questionError) {
           console.error('Error fetching question count:', questionError)
-        } else if (questionCount !== null) {
-          setStats(prev => ({ ...prev, questionsAnswered: questionCount }))
+          hasError = true
+        } else if (qCount !== null) {
+          questionCount = qCount
         }
 
         // Online players (using exact count on last_seen)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-        const { count: onlineCount, error: onlineError } = await supabase
+        const { count: oCount, error: onlineError } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .gt('last_seen', fiveMinutesAgo)
 
         if (onlineError) {
           console.error('Error fetching online count:', onlineError)
-        } else if (onlineCount !== null) {
-          setStats(prev => ({ ...prev, onlinePlayers: onlineCount }))
+          hasError = true
+        } else if (oCount !== null) {
+          onlineCount = oCount
+        }
+
+        // Update all stats at once
+        setStats(prev => ({
+          ...prev,
+          totalPlayers: profileCount,
+          questionsAnswered: questionCount,
+          onlinePlayers: onlineCount
+        }))
+
+        if (hasError) {
+          setStatsError('Some stats may be unavailable')
+        } else {
+          setStatsError(null)
         }
       } catch (err) {
         console.error('Unexpected error fetching global stats:', err)
+        setStatsError('Failed to load stats')
+      } finally {
+        setStatsLoading(false)
       }
     }
 
     fetchRecentGames()
     fetchGlobalStats()
-  }, [user, profile])
+  }, [])
 
   const features = [
     {
@@ -183,11 +227,26 @@ export function Landing() {
               { value: stats.gamesPlayed.toLocaleString(), label: 'Games Played' }
             ].map((stat, i) => (
               <div key={i} className="text-center">
-                <div className="text-2xl md:text-4xl font-bold text-white">{stat.value}</div>
+                {statsLoading && i < 3 ? (
+                  <div className="h-10 w-12 mx-auto mb-2 bg-surface-light rounded animate-pulse" />
+                ) : (
+                  <div className="text-2xl md:text-4xl font-bold text-white">{stat.value}</div>
+                )}
                 <div className="text-sm text-slate-500">{stat.label}</div>
               </div>
             ))}
           </motion.div>
+
+          {/* Stats Error Message */}
+          {statsError && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="max-w-4xl mx-auto mt-4 text-center text-sm text-slate-400"
+            >
+              {statsError}
+            </motion.div>
+          )}
         </div>
       </section>
 
@@ -218,34 +277,51 @@ export function Landing() {
       </section>
 
       {/* Recent Games */}
-      {recentGames.length > 0 && (
+      {(recentGames.length > 0 || gamesLoading) && (
         <section className="py-20 bg-surface/30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <h2 className="text-3xl font-bold text-center mb-12">Recent Battles</h2>
-            <div className="grid md:grid-cols-3 gap-6">
-              {recentGames.slice(0, 3).map((game, i) => (
-                <motion.div
-                  key={game.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  <Card className="text-center">
-                    <div className="text-sm text-slate-500 mb-2">
-                      {new Date(game.created_at).toLocaleDateString()}
-                    </div>
-                    <h4 className="font-bold text-white mb-2">{game.category}</h4>
-                    <div className="text-3xl font-black text-gradient mb-1">
-                      {game.question_count} Questions
-                    </div>
-                    <div className="text-sm text-slate-400">
-                      {game.players?.[0]?.count || 1} players
-                    </div>
+            {gamesLoading ? (
+              <div className="grid md:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="text-center">
+                    <div className="h-4 bg-surface-light rounded w-24 mx-auto mb-4 animate-pulse" />
+                    <div className="h-6 bg-surface-light rounded w-20 mx-auto mb-3 animate-pulse" />
+                    <div className="h-8 bg-surface-light rounded w-32 mx-auto mb-2 animate-pulse" />
+                    <div className="h-4 bg-surface-light rounded w-16 mx-auto animate-pulse" />
                   </Card>
-                </motion.div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : gamesError ? (
+              <div className="text-center py-8">
+                <p className="text-slate-400 mb-4">{gamesError}</p>
+              </div>
+            ) : recentGames.length > 0 ? (
+              <div className="grid md:grid-cols-3 gap-6">
+                {recentGames.slice(0, 3).map((game, i) => (
+                  <motion.div
+                    key={game.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                  >
+                    <Card className="text-center">
+                      <div className="text-sm text-slate-500 mb-2">
+                        {new Date(game.created_at).toLocaleDateString()}
+                      </div>
+                      <h4 className="font-bold text-white mb-2">{game.category || 'General'}</h4>
+                      <div className="text-3xl font-black text-gradient mb-1">
+                        {game.question_count} Questions
+                      </div>
+                      <div className="text-sm text-slate-400">
+                        {game.players?.[0]?.count || 1} players
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </section>
       )}
