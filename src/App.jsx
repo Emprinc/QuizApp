@@ -18,6 +18,8 @@ const Leaderboard = lazy(() => import('./pages/Leaderboard'))
 const Friends = lazy(() => import('./pages/Friends'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Admin = lazy(() => import('./pages/Admin'))
+const Quiz = lazy(() => import('./pages/Quiz'))
+const Shop = lazy(() => import('./pages/Shop'))
 
 // Components
 import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
@@ -102,6 +104,18 @@ function AppContent() {
           <Route path="/join/:code" element={
             <ProtectedRoute>
               <Room />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/shop" element={
+            <ProtectedRoute>
+              <Shop />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/quiz" element={
+            <ProtectedRoute>
+              <Quiz />
             </ProtectedRoute>
           } />
 

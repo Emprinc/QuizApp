@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Zap, Trophy, Users, User, LogOut, Menu, X } from 'lucide-react'
+import { Zap, Trophy, Users, User, LogOut, Menu, X, Target, ShoppingBag } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useState } from 'react'
 import { Avatar } from '../ui'
@@ -19,7 +19,9 @@ export function Header() {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Zap },
+    { path: '/quiz', label: 'Quiz', icon: Target },
     { path: '/lobby', label: 'Play', icon: Users },
+    { path: '/shop', label: 'Shop', icon: ShoppingBag },
     { path: '/leaderboard', label: 'Leaderboard', icon: Trophy },
     { path: '/friends', label: 'Friends', icon: Users }
   ]
@@ -138,7 +140,9 @@ export function BottomNav() {
 
   const navItems = [
     { path: '/', label: 'Home', icon: Zap },
+    { path: '/quiz', label: 'Quiz', icon: Target },
     { path: '/lobby', label: 'Play', icon: Users },
+    { path: '/shop', label: 'Shop', icon: ShoppingBag },
     { path: '/leaderboard', label: 'Rank', icon: Trophy },
     { path: '/profile', label: 'Profile', icon: User }
   ]

@@ -5,11 +5,13 @@ import { Users, UserPlus, Check, X, Clock, Sword, Trophy } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Card, Avatar, Button, EmptyState, LoadingSpinner, Modal, Input } from '../components/ui'
 import { supabase } from '../lib/supabase'
+import { useGame } from '../context/GameContext'
 import toast from 'react-hot-toast'
 
 export default function Friends() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
+  const { createDuel } = useGame()
   const [friends, setFriends] = useState([])
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)

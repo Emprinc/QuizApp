@@ -5,6 +5,20 @@ export const CATEGORIES = [
   { id: 'math', name: 'Mathematics', icon: 'PlusSquare', color: '#6366F1' }
 ]
 
+// Math topics (mirrors the 25 seeded topics in the database)
+export const MATH_TOPICS = [
+  'sets', 'percentages', 'fractions', 'indices', 'surds',
+  'binary_operations', 'relations_and_functions', 'sequence_and_series',
+  'word_problems', 'shapes', 'algebra_basics', 'linear_algebra',
+  'logarithms', 'probability', 'binomial_theorem', 'polynomial_functions',
+  'rational_functions', 'trigonometry', 'vectors', 'statistics',
+  'coordinate_geometry', 'intro_to_calculus', 'number_bases',
+  'modulo_arithmetic', 'advanced_combo'
+]
+
+export const QUIZ_LENGTH = 10
+export const WASSCE_QUIZ_LENGTH = 40
+
 export const DIFFICULTIES = ['easy', 'medium', 'hard']
 
 export const QUESTION_COUNTS = [5, 10, 15, 20]
@@ -52,4 +66,12 @@ export const getRankColor = (rank) => {
     case 3: return '#D97706' // Bronze
     default: return '#94A3B8'
   }
+}
+
+export const getTimeBasedGreeting = () => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  if (hour < 21) return 'Good evening'
+  return 'Good night'
 }
