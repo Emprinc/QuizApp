@@ -189,7 +189,7 @@ export function GameProvider({ children }) {
     }
   }, [user])
 
-  const createRoom = async (category, questionCount, timePerQuestion) => {
+  const createRoom = async (category, questionCount, timePerQuestion, options = {}) => {
     if (!user || !profile) return null
 
     const code = generateRoomCode()
@@ -202,7 +202,10 @@ export function GameProvider({ children }) {
         category,
         question_count: questionCount,
         time_per_question: timePerQuestion,
-        status: GAME_STATES.WAITING
+        status: GAME_STATES.WAITING,
+        mode: options.mode || 'room',
+        max_players: options.maxPlayers || 8,
+        topic_id: options.topicId || null,
       }])
       .select()
       .single()
@@ -695,6 +698,27 @@ export function GameProvider({ children }) {
       scores,
       roomChannel,
       createRoom,
+      createDuel: async (topicSlug, opponentId) => {
+        if (!user || !profile) return null
+        const room = await createRoom(topicSlug, 10, 15, {
+          mode: 'duel',
+          maxPlayers: 2,
+          topicId: null,
+        })
+        if (room && opponentId) {
+          try {
+            await broadcastEvent(room.id, 'duel_challenge', {
+              fromUserId: user.id,
+              fromUsername: profile.username,
+              roomCode: room.code,
+              roomId: room.id,
+            })
+          } catch (err) {
+            console.warn('Error broadcasting duel challenge:', err)
+          }
+        }
+        return room
+      },
       joinRoom,
       leaveRoom,
       startGame,
