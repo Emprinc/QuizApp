@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, Trophy, Target, Zap, Edit2, Save, LogOut, History, ChevronRight, Trash2, X } from 'lucide-react'
+import { User, Trophy, Target, Zap, FileEdit as Edit2, Save, LogOut, History, ChevronRight, Trash2, X, Award, TrendingUp, Coins, Flame } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Card, Avatar, Button, Input, LoadingSpinner } from '../components/ui'
 import { supabase } from '../lib/supabase'
+import { economyService } from '../services/economyService'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import toast from 'react-hot-toast'
 
 export default function Profile() {
@@ -16,6 +18,10 @@ export default function Profile() {
   const [selectedGame, setSelectedGame] = useState(null)
   const [gameDetails, setGameDetails] = useState([])
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [achievements, setAchievements] = useState([])
+  const [userAchievements, setUserAchievements] = useState([])
+  const [soloAttempts, setSoloAttempts] = useState([])
+  const [balance, setBalance] = useState(null)
 
   const handleSave = async () => {
     if (!username.trim()) {
@@ -46,9 +52,50 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       fetchHistory()
+      fetchAchievements()
+      fetchSoloAttempts()
+      fetchBalance()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
+
+  const fetchAchievements = async () => {
+    try {
+      const [allAch, userAch] = await Promise.all([
+        economyService.getAchievements(),
+        economyService.getUserAchievements(user.id),
+      ])
+      setAchievements(allAch)
+      setUserAchievements(userAch)
+    } catch (err) {
+      console.error('Error fetching achievements:', err)
+    }
+  }
+
+  const fetchSoloAttempts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('quiz_attempts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('finished_at', { ascending: false })
+        .limit(20)
+      if (error) throw error
+      setSoloAttempts(data || [])
+    } catch (err) {
+      console.error('Error fetching solo attempts:', err)
+      setSoloAttempts([])
+    }
+  }
+
+  const fetchBalance = async () => {
+    try {
+      const bal = await economyService.getBalance(user.id)
+      setBalance(bal)
+    } catch (err) {
+      console.error('Error fetching balance:', err)
+    }
+  }
 
   const fetchHistory = async () => {
     try {
@@ -270,19 +317,111 @@ export default function Profile() {
         </div>
       </section>
 
-      {/* Achievement Preview */}
+      {/* Achievement Display */}
       <section className="max-w-2xl mx-auto px-4 mb-6">
-        <h2 className="text-lg font-bold text-white mb-4">Achievements</h2>
-        <Card>
-          <div className="flex items-center gap-4 text-slate-400">
-            <Trophy className="w-8 h-8 text-gold opacity-50" />
-            <div>
-              <div className="font-medium text-white italic">Achievements system coming soon</div>
-              <div className="text-sm">Battle more to unlock exclusive badges!</div>
-            </div>
+        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <Award className="w-5 h-5 text-gold" />
+          Achievements
+        </h2>
+        {achievements.length === 0 ? (
+          <Card className="text-center py-8">
+            <p className="text-slate-400">No achievements available yet</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {achievements.map((ach) => {
+              const earned = userAchievements.some(ua => ua.achievement_id === ach.id)
+              return (
+                <Card key={ach.id} className={`text-center p-4 ${earned ? 'border-gold/30 bg-gold/5' : 'opacity-50'}`}>
+                  <div className="text-3xl mb-2">{ach.badge_icon || '🏆'}</div>
+                  <div className="font-bold text-white text-sm">{ach.name}</div>
+                  <div className="text-xs text-slate-400 mt-1">{ach.description}</div>
+                  {earned && <div className="text-xs text-gold mt-2 font-bold">Earned!</div>}
+                </Card>
+              )
+            })}
           </div>
+        )}
+      </section>
+
+      {/* Personal Analytics */}
+      <section className="max-w-2xl mx-auto px-4 mb-6">
+        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary" />
+          Performance
+        </h2>
+        <Card className="p-6">
+          {soloAttempts.length === 0 ? (
+            <p className="text-center text-slate-400 py-8">Take some quizzes to see your performance trend!</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{soloAttempts.length}</div>
+                  <div className="text-xs text-slate-500 uppercase">Quizzes Taken</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-success">
+                    {soloAttempts.reduce((sum, a) => sum + (a.questions_correct || 0), 0)}
+                  </div>
+                  <div className="text-xs text-slate-500 uppercase">Correct Answers</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gold">
+                    {soloAttempts.reduce((sum, a) => sum + (a.score || 0), 0).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-slate-500 uppercase">Total Points</div>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={soloAttempts.slice(0, 10).reverse().map((a, i) => ({
+                  name: `Q${i + 1}`,
+                  score: a.score || 0,
+                  correct: a.questions_correct || 0,
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="name" stroke="rgba(255,255,255,0.4)" fontSize={12} />
+                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={12} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1E293B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
+                  <Line type="monotone" dataKey="score" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </>
+          )}
         </Card>
       </section>
+
+      {/* Economy Summary */}
+      {balance && (
+        <section className="max-w-2xl mx-auto px-4 mb-6">
+          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <Coins className="w-5 h-5 text-gold" />
+            Wallet
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Card className="text-center p-4">
+              <Coins className="w-6 h-6 text-gold mx-auto mb-2" />
+              <div className="text-xl font-bold text-gold">{balance.coins || 0}</div>
+              <div className="text-xs text-slate-500 uppercase">Coins</div>
+            </Card>
+            <Card className="text-center p-4">
+              <Flame className="w-6 h-6 text-orange-500 mx-auto mb-2" />
+              <div className="text-xl font-bold text-orange-500">{balance.streak_days || 0}</div>
+              <div className="text-xs text-slate-500 uppercase">Day Streak</div>
+            </Card>
+            <Card className="text-center p-4">
+              <Zap className="w-6 h-6 text-primary mx-auto mb-2" />
+              <div className="text-xl font-bold text-primary">{balance.hint_tokens || 0}</div>
+              <div className="text-xs text-slate-500 uppercase">Hints</div>
+            </Card>
+            <Card className="text-center p-4">
+              <Trophy className="w-6 h-6 text-secondary mx-auto mb-2" />
+              <div className="text-xl font-bold text-secondary">{balance.mystery_boxes || 0}</div>
+              <div className="text-xs text-slate-500 uppercase">Mystery</div>
+            </Card>
+          </div>
+        </section>
+      )}
 
       {/* Game History */}
       <section className="max-w-2xl mx-auto px-4 mb-6">

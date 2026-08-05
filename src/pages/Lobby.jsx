@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Plus, ArrowRightLeft, Copy, Check, Zap, Clock, Target, ChevronDown } from 'lucide-react'
+import { Users, Plus, ArrowRightLeft, Copy, Check, Zap, Clock, Target, ChevronDown, Swords } from 'lucide-react'
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { Button, Card, Avatar, Modal } from '../components/ui'
-import { CATEGORIES, QUESTION_COUNTS, TIME_OPTIONS } from '../lib/constants'
+import { CATEGORIES, QUESTION_COUNTS, TIME_OPTIONS, MATH_TOPICS } from '../lib/constants'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 export default function Lobby() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
-  const { currentRoom, players, createRoom, joinRoom, leaveRoom } = useGame()
+  const { currentRoom, players, createRoom, createDuel, joinRoom, leaveRoom } = useGame()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -138,6 +138,22 @@ export default function Lobby() {
     }
   }
 
+  const handleQuickDuel = async () => {
+    setLoading(true)
+    try {
+      const topic = MATH_TOPICS[Math.floor(Math.random() * MATH_TOPICS.length)]
+      const room = await createDuel(topic, null)
+      if (room) {
+        toast.success('Duel room created! Share the code with a friend.')
+        navigate(`/room/${room.code}`)
+      }
+    } catch (error) {
+      toast.error(error.message || 'Failed to create duel')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const copyInviteLink = () => {
     if (currentRoom) {
       const link = `${window.location.origin}/join/${currentRoom.code}`
@@ -184,6 +200,10 @@ export default function Lobby() {
             <Button size="lg" variant="secondary" onClick={() => setShowJoinModal(true)}>
               <ArrowRightLeft className="w-5 h-5" />
               Join Room
+            </Button>
+            <Button size="lg" variant="ghost" onClick={handleQuickDuel} loading={loading}>
+              <Swords className="w-5 h-5" />
+              Quick Duel
             </Button>
           </motion.div>
         </div>
@@ -266,7 +286,7 @@ export default function Lobby() {
           {/* Category */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">Category</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
               {CATEGORIES.map(cat => (
                 <button
                   key={cat.id}
@@ -280,6 +300,21 @@ export default function Lobby() {
                   `}
                 >
                   {cat.name}
+                </button>
+              ))}
+              {MATH_TOPICS.map(slug => (
+                <button
+                  key={slug}
+                  onClick={() => setCreateForm({ ...createForm, category: slug })}
+                  className={`
+                    p-3 rounded-xl text-left text-sm font-medium transition-all
+                    ${createForm.category === slug
+                      ? 'bg-primary text-white'
+                      : 'bg-surface-light text-slate-300 hover:bg-surface'
+                    }
+                  `}
+                >
+                  {slug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                 </button>
               ))}
             </div>

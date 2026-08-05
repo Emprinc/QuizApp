@@ -20,6 +20,8 @@ const Profile = lazy(() => import('./pages/Profile'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Quiz = lazy(() => import('./pages/Quiz'))
 const Shop = lazy(() => import('./pages/Shop'))
+const Learn = lazy(() => import('./pages/Learn'))
+const Help = lazy(() => import('./pages/Help'))
 
 // Components
 import { ProtectedAdminRoute } from './components/ProtectedAdminRoute'
@@ -112,6 +114,9 @@ function AppContent() {
               <Shop />
             </ProtectedRoute>
           } />
+
+          <Route path="/learn" element={<Learn />} />
+          <Route path="/help" element={<Help />} />
 
           <Route path="/quiz" element={
             <ProtectedRoute>

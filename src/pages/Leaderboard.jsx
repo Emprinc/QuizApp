@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trophy, Medal, ChevronLeft, ChevronRight, History, Users, Star, Clock, Zap, Target } from 'lucide-react'
+import { Trophy, Medal, ChevronLeft, ChevronRight, History, Users, Star, Clock, Zap, Target, BookOpen } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Card, Avatar, EmptyState, LoadingSpinner, Button } from '../components/ui'
 import { supabase } from '../lib/supabase'
-import { getRankColor } from '../lib/constants'
+import { getRankColor, MATH_TOPICS } from '../lib/constants'
 
 export default function Leaderboard() {
   const { user, profile } = useAuth()
@@ -16,6 +16,9 @@ export default function Leaderboard() {
   const [userGlobalRank, setUserGlobalRank] = useState(0)
   const [gameHistory, setGameHistory] = useState([])
   const [friends, setFriends] = useState([])
+  const [soloHistory, setSoloHistory] = useState([])
+  const [topicLeaderboard, setTopicLeaderboard] = useState([])
+  const [selectedTopic, setSelectedTopic] = useState(MATH_TOPICS[0])
   const limit = 20
 
   useEffect(() => {
@@ -23,15 +26,18 @@ export default function Leaderboard() {
       fetchRankings()
     } else if (activeTab === 'history' && user) {
       fetchHistory()
+      fetchSoloHistory()
     } else if (activeTab === 'friends' && user) {
       fetchFriends()
+    } else if (activeTab === 'topics') {
+      fetchTopicLeaderboard()
     }
 
     if (user) {
       fetchUserRank()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, period, page, user?.id])
+  }, [activeTab, period, page, user?.id, selectedTopic])
 
   const fetchUserRank = async () => {
     const { data, error } = await supabase.rpc('get_user_rank', { p_user_id: user.id })
@@ -106,6 +112,41 @@ export default function Leaderboard() {
     } catch (err) {
       console.error('Error fetching history:', err)
       setGameHistory([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchSoloHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('quiz_attempts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('finished_at', { ascending: false })
+        .limit(10)
+      if (error) throw error
+      setSoloHistory(data || [])
+    } catch (err) {
+      console.error('Error fetching solo history:', err)
+      setSoloHistory([])
+    }
+  }
+
+  const fetchTopicLeaderboard = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('user_skill_levels')
+        .select('user_id, topic_slug, skill_score, profiles:profiles(username, avatar_url, total_score)')
+        .eq('topic_slug', selectedTopic)
+        .order('skill_score', { ascending: false })
+        .limit(20)
+      if (error) throw error
+      setTopicLeaderboard(data || [])
+    } catch (err) {
+      console.error('Error fetching topic leaderboard:', err)
+      setTopicLeaderboard([])
     } finally {
       setLoading(false)
     }
@@ -216,6 +257,7 @@ export default function Leaderboard() {
         <div className="flex items-center justify-center gap-2 p-1 bg-surface-light rounded-xl max-w-md mx-auto">
           {[
             { id: 'rankings', label: 'Rankings', icon: Star },
+            { id: 'topics', label: 'Topics', icon: BookOpen },
             { id: 'history', label: 'History', icon: History },
             { id: 'friends', label: 'Friends', icon: Users }
           ].map(tab => (
@@ -318,40 +360,121 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {activeTab === 'history' && (
-          <div className="space-y-4">
-            {loading ? <LoadingSpinner size="lg" /> : gameHistory.length === 0 ? (
-              <EmptyState icon={History} title="No games yet" description="Start playing to see your history here!" />
-            ) : (
-              gameHistory.map((game, i) => (
-                <motion.div
-                  key={game.room_id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
+        {activeTab === 'topics' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {MATH_TOPICS.map(slug => (
+                <button
+                  key={slug}
+                  onClick={() => setSelectedTopic(slug)}
+                  className={`
+                    px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all
+                    ${selectedTopic === slug
+                      ? 'bg-primary/20 text-primary border border-primary/30'
+                      : 'bg-surface-light text-slate-500 hover:text-white border border-transparent'
+                    }
+                  `}
                 >
-                  <Card>
-                    <div className="flex items-center justify-between">
+                  {slug.replace(/_/g, ' ')}
+                </button>
+              ))}
+            </div>
+
+            {loading ? <div className="py-12"><LoadingSpinner size="lg" /></div> : topicLeaderboard.length === 0 ? (
+              <EmptyState icon={BookOpen} title="No data yet" description={`Be the first to master ${selectedTopic.replace(/_/g, ' ')}!`} />
+            ) : (
+              <div className="space-y-3">
+                {topicLeaderboard.map((entry, index) => (
+                  <motion.div
+                    key={entry.user_id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Card className={entry.user_id === user?.id ? 'border-primary/50 bg-primary/10' : ''}>
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Zap className="w-5 h-5 text-primary" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg" style={{ backgroundColor: getRankColor(index + 1), color: index + 1 > 3 ? '#0F172A' : '#FFF' }}>
+                          {index + 1 <= 3 ? <Medal className="w-5 h-5" /> : index + 1}
+                        </div>
+                        <Avatar username={entry.profiles?.username} avatarUrl={entry.profiles?.avatar_url} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-white truncate">{entry.profiles?.username} {entry.user_id === user?.id && <span className="text-xs text-primary">(You)</span>}</div>
+                          <div className="text-xs text-slate-400">{entry.profiles?.total_score?.toLocaleString() || 0} total points</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-gradient">{entry.skill_score}</div>
+                          <div className="text-[10px] text-slate-500 uppercase font-bold">skill</div>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-6">
+            {/* Solo Quiz History */}
+            <div>
+              <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Target className="w-4 h-4 text-primary" /> Solo Quizzes</h3>
+              {soloHistory.length === 0 ? (
+                <Card className="text-center py-4"><p className="text-slate-500 text-sm">No solo quizzes yet. <Link to="/quiz" className="text-primary">Take one!</Link></p></Card>
+              ) : (
+                <div className="space-y-2">
+                  {soloHistory.map((quiz, i) => (
+                    <Card key={quiz.id} className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Target className="w-4 h-4 text-primary" />
                         </div>
                         <div>
-                          <div className="font-bold text-white uppercase text-sm">{game.room?.category}</div>
-                          <div className="text-xs text-slate-500">
-                            {new Date(game.joined_at).toLocaleDateString()} • {game.room?.question_count} Q
-                          </div>
+                          <div className="font-bold text-white text-sm capitalize">{quiz.topic_slug.replace(/_/g, ' ')}</div>
+                          <div className="text-xs text-slate-500">{quiz.finished_at ? new Date(quiz.finished_at).toLocaleDateString() : ''} • {quiz.difficulty}</div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-gradient">{game.score}</div>
-                        <div className="text-[10px] text-slate-500 uppercase font-bold">Points</div>
+                        <div className="text-lg font-bold text-gradient">{quiz.score}</div>
+                        <div className="text-[10px] text-slate-500 uppercase font-bold">{quiz.questions_correct}/{quiz.questions_answered}</div>
                       </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))
-            )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Multiplayer History */}
+            <div>
+              <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Multiplayer Games</h3>
+              {loading ? <LoadingSpinner size="lg" /> : gameHistory.length === 0 ? (
+                <EmptyState icon={History} title="No games yet" description="Start playing to see your history here!" />
+              ) : (
+                <div className="space-y-3">
+                  {gameHistory.map((game, i) => (
+                    <motion.div key={game.room_id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
+                      <Card>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Zap className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-white uppercase text-sm">{game.room?.category}</div>
+                              <div className="text-xs text-slate-500">{new Date(game.joined_at).toLocaleDateString()} • {game.room?.question_count} Q</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-gradient">{game.score}</div>
+                            <div className="text-[10px] text-slate-500 uppercase font-bold">Points</div>
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

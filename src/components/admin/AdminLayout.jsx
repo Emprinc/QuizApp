@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogOut, Menu, X, LayoutDashboard, HelpCircle, Users, Zap, BarChart3 } from 'lucide-react'
+import { LogOut, Menu, X, LayoutDashboard, HelpCircle, Users, Zap, BarChart3, Target, GraduationCap } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { Avatar } from '../ui'
 
@@ -13,6 +13,8 @@ export function AdminLayout({ children }) {
   const adminNavItems = [
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/questions', label: 'Questions', icon: HelpCircle },
+    { path: '/admin/challenges', label: 'Challenges', icon: Target },
+    { path: '/admin/students', label: 'Students', icon: GraduationCap },
     { path: '/admin/users', label: 'Users', icon: Users },
     { path: '/admin/rooms', label: 'Rooms', icon: Zap },
     { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 }

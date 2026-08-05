@@ -5,6 +5,7 @@ import { Copy, Check, Users, Zap, Clock, Play, LogOut, Trophy, Sparkles, X } fro
 import { useGame } from '../context/GameContext'
 import { useAuth } from '../context/AuthContext'
 import { Button, Card, Avatar, LoadingSpinner } from '../components/ui'
+import { MathText } from '../components/ui/MathText'
 import { GAME_STATES, getRankColor } from '../lib/constants'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
@@ -397,7 +398,12 @@ export default function Room() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white">Room: {code}</h1>
-            <p className="text-slate-400">{currentRoom.category} - {currentRoom.question_count} Questions</p>
+            <p className="text-slate-400">
+              {currentRoom.mode === 'duel' && (
+                <span className="inline-block px-2 py-0.5 rounded-full bg-danger/20 text-danger text-xs font-bold mr-2">DUEL</span>
+              )}
+              {currentRoom.category} - {currentRoom.question_count} Questions
+            </p>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />
@@ -430,7 +436,7 @@ export default function Room() {
         <Card className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-primary" />
-            <h3 className="font-bold text-white">Players ({players.length}/8)</h3>
+            <h3 className="font-bold text-white">Players ({players.length}/{currentRoom.max_players || 8})</h3>
           </div>
 
           <div className="space-y-3">
@@ -457,9 +463,11 @@ export default function Room() {
               </motion.div>
             ))}
 
-            {players.length < 8 && (
+            {players.length < (currentRoom.max_players || 8) && (
               <div className="text-center py-4 text-slate-500">
-                Waiting for more players...
+                {currentRoom.mode === 'duel'
+                  ? 'Waiting for opponent to join...'
+                  : 'Waiting for more players...'}
               </div>
             )}
           </div>
@@ -621,7 +629,7 @@ function BattleView() {
             className="bg-surface rounded-2xl p-6 mb-6"
           >
             <h2 className="text-xl md:text-2xl font-bold text-white text-center leading-relaxed">
-              {currentQuestion?.question_text}
+              <MathText text={currentQuestion?.question_text || ''} />
             </h2>
           </motion.div>
         </AnimatePresence>
@@ -670,7 +678,7 @@ function BattleView() {
                      showCorrect && isSelected && !isCorrect ? '✗' :
                      String.fromCharCode(65 + index)}
                   </div>
-                  <span className="text-white font-medium">{option}</span>
+                  <span className="text-white font-medium"><MathText text={option} /></span>
                 </div>
               </motion.button>
             )

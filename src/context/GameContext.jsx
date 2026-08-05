@@ -1,8 +1,11 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
-import { generateRoomCode, GAME_STATES } from '../lib/constants'
+import { generateRoomCode, GAME_STATES, MATH_TOPICS } from '../lib/constants'
 import { useAuth } from './AuthContext'
+import { generateQuestion } from '../engine'
+import { createRandomRng } from '../engine/rng'
+import { difficultyFor } from '../engine/adaptive'
 
 const GameContext = createContext(null)
 
@@ -394,29 +397,56 @@ export function GameProvider({ children }) {
   const startGame = async () => {
     if (!currentRoom || !user) return
 
-    // Fetch a larger pool of questions for better randomization
-    const { data: questions } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('category', currentRoom.category)
-      .limit(50)
+    let selectedQuestions = []
 
-    if (!questions || questions.length === 0) {
-      throw new Error('No questions available for this category')
-    }
+    if (currentRoom.mode === 'duel' || MATH_TOPICS.includes(currentRoom.category)) {
+      // Generate questions from the math engine for duels and math-topic rooms
+      const rng = createRandomRng()
+      const topicSlug = currentRoom.category
+      const skillScore = 50 // default; could fetch per-user later
+      const difficulty = difficultyFor(skillScore)
+      const numQ = currentRoom.question_count || 10
 
-    // Local Fisher-Yates shuffle for better randomness than Array.sort()
-    const shuffle = (array) => {
-      const newArray = [...array]
-      for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]]
+      for (let i = 0; i < numQ; i++) {
+        const q = generateQuestion(topicSlug, difficulty, rng)
+        // Normalize to the shape expected by BattleView/game_sessions
+        const correctIdx = q.options.indexOf(q.answer)
+        selectedQuestions.push({
+          id: `gen_${i}`,
+          question_text: q.question,
+          options: q.options,
+          correct_answer: correctIdx,
+          explanation: q.explanation,
+          hint: q.hint,
+          difficulty: q.difficulty,
+          category: topicSlug,
+        })
       }
-      return newArray
+    } else {
+      // Legacy: fetch from questions table for non-math categories
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('category', currentRoom.category)
+        .limit(50)
+
+      if (!questions || questions.length === 0) {
+        throw new Error('No questions available for this category')
+      }
+
+      const shuffle = (array) => {
+        const newArray = [...array]
+        for (let i = newArray.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newArray[i], newArray[j]] = [newArray[j], newArray[i]]
+        }
+        return newArray
+      }
+
+      const shuffled = shuffle(questions)
+      selectedQuestions = shuffled.slice(0, Math.min(questions.length, currentRoom.question_count))
     }
 
-    const shuffled = shuffle(questions)
-    const selectedQuestions = shuffled.slice(0, Math.min(questions.length, currentRoom.question_count))
     questionsRef.current = selectedQuestions
 
     if (questionsRef.current.length < currentRoom.question_count) {
@@ -707,14 +737,24 @@ export function GameProvider({ children }) {
         })
         if (room && opponentId) {
           try {
-            await broadcastEvent(room.id, 'duel_challenge', {
-              fromUserId: user.id,
-              fromUsername: profile.username,
-              roomCode: room.code,
-              roomId: room.id,
+            // Send challenge directly to opponent's personal channel
+            const opponentChannel = supabase.channel(`duel-listen-${opponentId}`)
+            await opponentChannel.subscribe()
+            await opponentChannel.send({
+              type: 'broadcast',
+              event: 'duel_challenge',
+              payload: {
+                fromUserId: user.id,
+                fromUsername: profile.username,
+                roomCode: room.code,
+                roomId: room.id,
+                toUserId: opponentId,
+              },
             })
+            // Unsubscribe after sending — opponent's listener will catch it
+            setTimeout(() => supabase.removeChannel(opponentChannel), 3000)
           } catch (err) {
-            console.warn('Error broadcasting duel challenge:', err)
+            console.warn('Error sending duel challenge:', err)
           }
         }
         return room

@@ -28,6 +28,45 @@ export default function Friends() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  // Listen for incoming duel challenges
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase.channel(`duel-listen-${user.id}`)
+
+    channel.on('broadcast', { event: 'duel_challenge' }, ({ payload }) => {
+      if (payload.toUserId === user.id || payload.toUserId === undefined) {
+        toast(
+          (t) => (
+            <div className="flex items-center gap-3">
+              <Sword className="w-5 h-5 text-primary" />
+              <div className="flex-1">
+                <div className="font-bold text-white">{payload.fromUsername} challenges you!</div>
+                <div className="text-xs text-slate-400">Tap to join the duel</div>
+              </div>
+              <button
+                className="px-3 py-1 rounded-lg bg-primary text-white text-sm font-bold"
+                onClick={() => {
+                  navigate(`/room/${payload.roomCode}`)
+                  toast.dismiss(t.id)
+                }}
+              >
+                Join
+              </button>
+            </div>
+          ),
+          { duration: 10000, style: { background: '#1e293b', padding: '12px' } }
+        )
+      }
+    })
+
+    channel.subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, navigate])
+
   const fetchFriends = async () => {
     try {
       const { data, error } = await supabase
@@ -285,7 +324,18 @@ export default function Friends() {
                       </div>
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="secondary" onClick={() => navigate('/lobby')}>
+                      <Button size="sm" variant="secondary" onClick={async () => {
+                        toast.loading('Creating duel...')
+                        const room = await createDuel('advanced_combo', friend.id)
+                        if (room) {
+                          toast.dismiss()
+                          toast.success(`Duel challenge sent to ${friend.username}!`)
+                          navigate(`/room/${room.code}`)
+                        } else {
+                          toast.dismiss()
+                          toast.error('Failed to create duel')
+                        }
+                      }}>
                         <Sword className="w-4 h-4" />
                         Challenge
                       </Button>

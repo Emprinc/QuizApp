@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Zap, Trophy, Users, User, LogOut, Menu, X, Target, ShoppingBag } from 'lucide-react'
+import { Zap, Trophy, Users, User, LogOut, Menu, X, Target, ShoppingBag, BookOpen, HelpCircle } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useState } from 'react'
 import { Avatar } from '../ui'
@@ -20,6 +20,7 @@ export function Header() {
   const navItems = [
     { path: '/', label: 'Home', icon: Zap },
     { path: '/quiz', label: 'Quiz', icon: Target },
+    { path: '/learn', label: 'Learn', icon: BookOpen },
     { path: '/lobby', label: 'Play', icon: Users },
     { path: '/shop', label: 'Shop', icon: ShoppingBag },
     { path: '/leaderboard', label: 'Leaderboard', icon: Trophy },
@@ -73,6 +74,20 @@ export function Header() {
                   <span className="hidden sm:block text-sm font-medium text-slate-300">
                     {profile?.username}
                   </span>
+                </Link>
+                <Link
+                  to="/help"
+                  className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+                  title="Help"
+                >
+                  <HelpCircle className="w-5 h-5" />
+                </Link>
+                <Link
+                  to="/learn"
+                  className="hidden md:flex p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+                  title="Learn"
+                >
+                  <BookOpen className="w-5 h-5" />
                 </Link>
                 <button
                   onClick={handleLogout}
@@ -142,7 +157,6 @@ export function BottomNav() {
     { path: '/', label: 'Home', icon: Zap },
     { path: '/quiz', label: 'Quiz', icon: Target },
     { path: '/lobby', label: 'Play', icon: Users },
-    { path: '/shop', label: 'Shop', icon: ShoppingBag },
     { path: '/leaderboard', label: 'Rank', icon: Trophy },
     { path: '/profile', label: 'Profile', icon: User }
   ]
