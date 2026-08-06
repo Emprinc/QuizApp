@@ -291,17 +291,30 @@ CREATE OR REPLACE FUNCTION public.update_challenge_progress(
   p_challenge_id UUID,
   p_progress INTEGER
 ) RETURNS void AS $$
+DECLARE
+  target_count INTEGER;
+  new_progress INTEGER;
+  should_complete BOOLEAN;
 BEGIN
-  INSERT INTO public.user_challenge_progress (user_id, challenge_id, date, progress, completed)
-    VALUES (p_user_id, p_challenge_id, CURRENT_DATE, p_progress, p_progress >= (
-      SELECT target_count FROM public.challenges WHERE id = p_challenge_id
-    ))
+  -- Get challenge target count
+  SELECT challenges.target_count INTO target_count FROM public.challenges WHERE id = p_challenge_id;
+  
+  IF target_count IS NULL THEN
+    RAISE EXCEPTION 'Challenge not found';
+  END IF;
+
+  -- Calculate new progress and completion status
+  new_progress := p_progress;
+  should_complete := new_progress >= target_count;
+
+  -- Upsert challenge progress
+  INSERT INTO public.user_challenge_progress (user_id, challenge_id, date, progress, completed, completed_at)
+    VALUES (p_user_id, p_challenge_id, CURRENT_DATE, new_progress, should_complete, CASE WHEN should_complete THEN NOW() ELSE NULL END)
     ON CONFLICT (user_id, challenge_id, date)
-    DO UPDATE SET progress = GREATEST(user_challenge_progress.progress, EXCLUDED.progress),
-                  completed = user_challenge_progress.progress >= (
-      SELECT target_count FROM public.challenges WHERE id = p_challenge_id
-    ),
-                  completed_at = CASE WHEN user_challenge_progress.completed IS FALSE AND EXCLUDED.completed THEN NOW() ELSE user_challenge_progress.completed_at END;
+    DO UPDATE SET 
+      progress = GREATEST(user_challenge_progress.progress, new_progress),
+      completed = CASE WHEN EXCLUDED.completed OR (EXCLUDED.progress >= target_count) THEN TRUE ELSE user_challenge_progress.completed END,
+      completed_at = CASE WHEN user_challenge_progress.completed IS FALSE AND (EXCLUDED.progress >= target_count) THEN NOW() ELSE user_challenge_progress.completed_at END;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

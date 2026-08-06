@@ -216,6 +216,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- assign_role(): admin-only function to assign roles to users
+CREATE OR REPLACE FUNCTION public.assign_role(
+  p_user_id UUID,
+  p_role TEXT
+) RETURNS BOOLEAN AS $$
+BEGIN
+  IF NOT (p_role IN ('student', 'teacher', 'admin')) THEN
+    RAISE EXCEPTION 'Invalid role: %', p_role;
+  END IF;
+
+  INSERT INTO public.user_roles (user_id, role)
+    VALUES (p_user_id, p_role)
+    ON CONFLICT (user_id, role) DO NOTHING;
+
+  RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- update_player_stats (existing, retained)
 CREATE OR REPLACE FUNCTION public.update_player_stats(
   p_user_id UUID,
@@ -330,6 +348,7 @@ ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: public read, restricted update (no score/coin columns)
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
@@ -369,6 +388,13 @@ DROP POLICY IF EXISTS "Users can read own roles" ON public.user_roles;
 CREATE POLICY "Users can read own roles"
   ON public.user_roles FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
+
+-- user_roles: admins manage all user roles
+DROP POLICY IF EXISTS "Admins can manage user roles" ON public.user_roles;
+CREATE POLICY "Admins can manage user roles"
+  ON public.user_roles FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
 -- subjects: public read
 DROP POLICY IF EXISTS "Subjects are publicly readable" ON public.subjects;
