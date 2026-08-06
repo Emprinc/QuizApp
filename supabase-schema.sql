@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.subjects (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Topics (per-subject taxonomy)
+-- Topics (per-subject taxonomy) — created before questions to allow FK references
 CREATE TABLE IF NOT EXISTS public.topics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,

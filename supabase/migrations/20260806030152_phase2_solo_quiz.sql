@@ -1,6 +1,19 @@
 /*
 # Phase 2 — Solo Quiz Runtime
+
+IMPORTANT: This migration assumes Phase 0 has completed successfully.
+Required Phase 0 tables: profiles, topics, user_skill_levels
 */
+
+-- Ensure prerequisite tables exist (defensive check for idempotency)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'topics' AND table_schema = 'public'
+  ) THEN
+    RAISE EXCEPTION 'ERROR: Phase 0 migration must run first. Table public.topics not found.';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
