@@ -166,35 +166,48 @@ CREATE TABLE IF NOT EXISTS public.friendships (
 
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  topic_id UUID NOT NULL REFERENCES public.topics(id) ON DELETE RESTRICT,
-  difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard')),
-  question_count INTEGER DEFAULT 10,
-  score INTEGER,
-  is_completed BOOLEAN DEFAULT FALSE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  topic_id UUID REFERENCES public.topics(id) ON DELETE SET NULL,
+  topic_slug TEXT NOT NULL,
+  difficulty TEXT CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
+  score INTEGER DEFAULT 0,
+  questions_answered INTEGER DEFAULT 0,
+  questions_correct INTEGER DEFAULT 0,
+  coins_earned INTEGER DEFAULT 0,
+  mode TEXT DEFAULT 'solo',
+  state JSONB,
   started_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  finished_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS public.quiz_answers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quiz_attempt_id UUID NOT NULL REFERENCES public.quiz_attempts(id) ON DELETE CASCADE,
-  question_id UUID NOT NULL REFERENCES public.questions(id),
-  topic_id UUID NOT NULL REFERENCES public.topics(id),
+  attempt_id UUID REFERENCES public.quiz_attempts(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  question_text TEXT NOT NULL,
+  question_data JSONB NOT NULL,
   selected_answer INTEGER,
+  correct_answer INTEGER,
   is_correct BOOLEAN,
   time_taken_ms INTEGER,
+  score_earned INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.user_skill_levels (
-  user_id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
-  math_level INTEGER DEFAULT 0,
-  science_level INTEGER DEFAULT 0,
-  english_level INTEGER DEFAULT 0,
-  history_level INTEGER DEFAULT 0,
-  geography_level INTEGER DEFAULT 0,
-  last_updated TIMESTAMPTZ DEFAULT NOW()
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  topic_slug TEXT NOT NULL,
+  skill_score INTEGER DEFAULT 50,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, topic_slug)
+);
+
+CREATE TABLE IF NOT EXISTS public.seen_questions (
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  question_hash TEXT NOT NULL,
+  topic_slug TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, question_hash)
 );
 
 -- ============================================
@@ -203,20 +216,18 @@ CREATE TABLE IF NOT EXISTS public.user_skill_levels (
 
 CREATE TABLE IF NOT EXISTS public.coin_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   amount INTEGER NOT NULL,
-  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('earn', 'spend')),
-  reason TEXT,
+  description TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.achievements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
+  name TEXT UNIQUE NOT NULL,
   description TEXT,
-  icon TEXT,
-  reward_coins INTEGER DEFAULT 0,
+  badge_icon TEXT,
+  coin_reward INTEGER DEFAULT 100,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -230,10 +241,11 @@ CREATE TABLE IF NOT EXISTS public.user_achievements (
 
 CREATE TABLE IF NOT EXISTS public.challenges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  description TEXT,
-  target_count INTEGER NOT NULL,
-  reward_coins INTEGER,
+  description TEXT NOT NULL,
+  topic_slug TEXT,
+  target_count INTEGER DEFAULT 10,
+  coin_reward INTEGER DEFAULT 50,
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -258,8 +270,11 @@ CREATE INDEX IF NOT EXISTS idx_profiles_school ON public.profiles(school_id);
 CREATE INDEX IF NOT EXISTS idx_user_roles_user ON public.user_roles(user_id);
 CREATE INDEX IF NOT EXISTS idx_friendships_sender ON public.friendships(sender_id);
 CREATE INDEX IF NOT EXISTS idx_friendships_receiver ON public.friendships(receiver_id);
-CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_topic ON public.quiz_attempts(user_id, topic_id);
-CREATE INDEX IF NOT EXISTS idx_quiz_answers_attempt ON public.quiz_answers(quiz_attempt_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON public.quiz_attempts(user_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_topic ON public.quiz_attempts(topic_slug);
+CREATE INDEX IF NOT EXISTS idx_quiz_answers_attempt ON public.quiz_answers(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_answers_user ON public.quiz_answers(user_id);
+CREATE INDEX IF NOT EXISTS idx_seen_questions_user ON public.seen_questions(user_id);
 CREATE INDEX IF NOT EXISTS idx_coin_transactions_user ON public.coin_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON public.user_achievements(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_challenge_progress_user ON public.user_challenge_progress(user_id);
