@@ -512,7 +512,7 @@ export default function Room() {
 // Battle View Component
 function BattleView() {
   const { user } = useAuth()
-  const { currentRoom, players, currentQuestion, currentRound, submitAnswer, gameState, roomChannel } = useGame()
+  const { currentRoom, players, currentQuestion, setCurrentQuestion, currentRound, submitAnswer, gameState, roomChannel } = useGame()
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [timeLeft, setTimeLeft] = useState(currentRoom?.time_per_question || 15)
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)

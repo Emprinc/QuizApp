@@ -275,11 +275,16 @@ export function GameProvider({ children }) {
           .insert([{
             room_id: room.id,
             player_id: user.id,
-          score: 0
-        }])
-    }
+            score: 0
+          }])
 
-    setCurrentRoom(room)
+        if (insertError) {
+          console.error('Error joining room:', insertError)
+          throw new Error('Failed to join room')
+        }
+      }
+
+      setCurrentRoom(room)
     const channel = subscribeToRoom(room.id)
 
     // Broadcast player joined using the channel directly to avoid race conditions

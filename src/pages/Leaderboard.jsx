@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Trophy, Medal, ChevronLeft, ChevronRight, History, Users, Star, Clock, Zap, Target, BookOpen } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
