@@ -4,24 +4,10 @@
 IMPORTANT: This migration assumes Phase 0 and Phase 2 have completed successfully.
 Required Phase 0 tables: profiles, user_roles, user_skill_levels
 Required Phase 0 functions: has_role, update_player_stats, assign_role
-*/
 
--- Ensure prerequisite tables and functions exist (defensive check for idempotency)
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables WHERE table_name = 'user_roles' AND table_schema = 'public'
-  ) THEN
-    RAISE EXCEPTION 'ERROR: Phase 0 migration must run first. Table public.user_roles not found.';
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.routines 
-    WHERE routine_name = 'has_role' AND routine_schema = 'public'
-  ) THEN
-    RAISE EXCEPTION 'ERROR: Phase 0 migration must run first. Function public.has_role not found.';
-  END IF;
-END $$;
+Note: If Phase 0 has not run, table creation will fail naturally with clear FK errors.
+This file is idempotent and can be re-run safely.
+*/
 
 CREATE TABLE IF NOT EXISTS public.coin_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

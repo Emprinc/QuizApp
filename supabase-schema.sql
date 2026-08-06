@@ -10,14 +10,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- PHASE 0 TABLES
 -- ============================================
 
--- Schools (multi-tenancy foundation)
-CREATE TABLE IF NOT EXISTS public.schools (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  code TEXT UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Subjects (data-driven taxonomy)
 CREATE TABLE IF NOT EXISTS public.subjects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,14 +21,22 @@ CREATE TABLE IF NOT EXISTS public.subjects (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Topics (per-subject taxonomy) — created before questions to allow FK references
+-- Topics (per-subject taxonomy) — MUST be created before questions for FK constraint
 CREATE TABLE IF NOT EXISTS public.topics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES public.subjects(id) ON DELETE CASCADE,
   slug TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
   display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Schools (for profiles FK)
+CREATE TABLE IF NOT EXISTS public.schools (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  code TEXT UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
