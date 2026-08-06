@@ -368,7 +368,7 @@ CREATE POLICY "Users can update own profile"
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = id AND is_admin = false);
+  WITH CHECK (auth.uid() = id);
 
 -- user_roles: users read own roles
 DROP POLICY IF EXISTS "Users can read own roles" ON public.user_roles;
