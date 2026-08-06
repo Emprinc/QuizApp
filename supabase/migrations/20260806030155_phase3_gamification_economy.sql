@@ -1,6 +1,27 @@
 /*
 # Phase 3 — Gamification & Economy
+
+IMPORTANT: This migration assumes Phase 0 and Phase 2 have completed successfully.
+Required Phase 0 tables: profiles, user_roles, user_skill_levels
+Required Phase 0 functions: has_role, update_player_stats, assign_role
 */
+
+-- Ensure prerequisite tables and functions exist (defensive check for idempotency)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'user_roles' AND table_schema = 'public'
+  ) THEN
+    RAISE EXCEPTION 'ERROR: Phase 0 migration must run first. Table public.user_roles not found.';
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.routines 
+    WHERE routine_name = 'has_role' AND routine_schema = 'public'
+  ) THEN
+    RAISE EXCEPTION 'ERROR: Phase 0 migration must run first. Function public.has_role not found.';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.coin_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,8 +106,8 @@ CREATE POLICY "Challenges are publicly readable"
 DROP POLICY IF EXISTS "Admins can manage challenges" ON public.challenges;
 CREATE POLICY "Admins can manage challenges"
   ON public.challenges FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'teacher'))
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'teacher'));
+  USING (public.has_role(auth.uid(), 'admin'::TEXT) OR public.has_role(auth.uid(), 'teacher'::TEXT))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'::TEXT) OR public.has_role(auth.uid(), 'teacher'::TEXT));
 
 DROP POLICY IF EXISTS "Users can view own progress" ON public.user_challenge_progress;
 CREATE POLICY "Users can view own progress"

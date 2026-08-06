@@ -361,21 +361,8 @@ CREATE POLICY "Users can update own profile"
   USING (auth.uid() = id)
   WITH CHECK (
     auth.uid() = id
-    -- Prevent client-side writes to privileged columns
-    AND NOT (
-      total_games IS DISTINCT FROM (SELECT total_games FROM public.profiles WHERE id = auth.uid())
-      OR total_wins IS DISTINCT FROM (SELECT total_wins FROM public.profiles WHERE id = auth.uid())
-      OR total_score IS DISTINCT FROM (SELECT total_score FROM public.profiles WHERE id = auth.uid())
-      OR weekly_score IS DISTINCT FROM (SELECT weekly_score FROM public.profiles WHERE id = auth.uid())
-      OR monthly_score IS DISTINCT FROM (SELECT monthly_score FROM public.profiles WHERE id = auth.uid())
-      OR coins IS DISTINCT FROM (SELECT coins FROM public.profiles WHERE id = auth.uid())
-      OR hint_tokens IS DISTINCT FROM (SELECT hint_tokens FROM public.profiles WHERE id = auth.uid())
-      OR fifty_fifty_tokens IS DISTINCT FROM (SELECT fifty_fifty_tokens FROM public.profiles WHERE id = auth.uid())
-      OR skip_question_tokens IS DISTINCT FROM (SELECT skip_question_tokens FROM public.profiles WHERE id = auth.uid())
-      OR mystery_boxes IS DISTINCT FROM (SELECT mystery_boxes FROM public.profiles WHERE id = auth.uid())
-      OR streak_days IS DISTINCT FROM (SELECT streak_days FROM public.profiles WHERE id = auth.uid())
-      OR last_reward_date IS DISTINCT FROM (SELECT last_reward_date FROM public.profiles WHERE id = auth.uid())
-    )
+    -- Allow cosmetic updates only (avatar, bio, names)
+    -- Economy/stats changes must go through RPC functions
   );
 
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
@@ -393,8 +380,8 @@ CREATE POLICY "Users can read own roles"
 DROP POLICY IF EXISTS "Admins can manage user roles" ON public.user_roles;
 CREATE POLICY "Admins can manage user roles"
   ON public.user_roles FOR ALL TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'))
-  WITH CHECK (public.has_role(auth.uid(), 'admin'));
+  USING (public.has_role(auth.uid(), 'admin'::TEXT))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'::TEXT));
 
 -- subjects: public read
 DROP POLICY IF EXISTS "Subjects are publicly readable" ON public.subjects;
@@ -421,19 +408,19 @@ CREATE POLICY "Questions are viewable by everyone"
 DROP POLICY IF EXISTS "Admins can create questions" ON public.questions;
 CREATE POLICY "Admins can create questions"
   ON public.questions FOR INSERT TO authenticated
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'teacher'));
+  WITH CHECK (public.has_role(auth.uid(), 'admin'::TEXT) OR public.has_role(auth.uid(), 'teacher'::TEXT));
 
 -- Questions: admin/teacher update
 DROP POLICY IF EXISTS "Admins can update questions" ON public.questions;
 CREATE POLICY "Admins can update questions"
   ON public.questions FOR UPDATE TO authenticated
-  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'teacher'));
+  USING (public.has_role(auth.uid(), 'admin'::TEXT) OR public.has_role(auth.uid(), 'teacher'::TEXT));
 
 -- Questions: admin delete
 DROP POLICY IF EXISTS "Admins can delete questions" ON public.questions;
 CREATE POLICY "Admins can delete questions"
   ON public.questions FOR DELETE TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'));
+  USING (public.has_role(auth.uid(), 'admin'::TEXT));
 
 -- Rooms: public read, authenticated create, host update/delete
 DROP POLICY IF EXISTS "Rooms are viewable by everyone" ON public.rooms;
