@@ -512,7 +512,7 @@ export default function Room() {
 // Battle View Component
 function BattleView() {
   const { user } = useAuth()
-  const { currentRoom, players, currentQuestion, setCurrentQuestion, currentRound, submitAnswer, gameState, roomChannel } = useGame()
+  const { currentRoom, players, currentQuestion, currentRound, submitAnswer, gameState, roomChannel } = useGame()
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [timeLeft, setTimeLeft] = useState(currentRoom?.time_per_question || 15)
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false)
@@ -556,17 +556,8 @@ function BattleView() {
     const handleRoundEnd = ({ payload }) => {
       setIsAnswerRevealed(true)
 
-      // If we didn't have the correct answer locally (security), use the one from broadcast
-      if (payload.correctAnswerIndex !== undefined) {
-        setCurrentQuestion(prev => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            correctAnswer: payload.correctAnswerIndex
-          }
-        })
-      }
-
+      // Note: The correct answer is revealed through the broadcast payload
+      // Local state can use payload.correctAnswerIndex for validation
       if (selectedAnswer !== null && payload.correctAnswerIndex !== undefined) {
         const isCorrect = selectedAnswer === payload.correctAnswerIndex
         if (isCorrect) {
