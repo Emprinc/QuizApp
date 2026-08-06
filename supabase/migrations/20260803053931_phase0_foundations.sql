@@ -301,6 +301,7 @@ GRANT SELECT ON public.questions TO anon, authenticated;
 GRANT SELECT ON public.rooms TO anon, authenticated;
 GRANT SELECT ON public.room_players TO anon, authenticated;
 GRANT SELECT ON public.profiles TO anon, authenticated;
+GRANT SELECT ON public.game_sessions TO anon, authenticated;
 
 -- Authenticated write tables
 GRANT INSERT, UPDATE, DELETE ON public.rooms TO authenticated;
@@ -479,6 +480,16 @@ DROP POLICY IF EXISTS "Users can delete own friendships" ON public.friendships;
 CREATE POLICY "Users can delete own friendships"
   ON public.friendships FOR DELETE TO authenticated
   USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+-- Game sessions: public read (view progress), authenticated write via app logic
+DROP POLICY IF EXISTS "Game sessions are viewable by everyone" ON public.game_sessions;
+CREATE POLICY "Game sessions are viewable by everyone"
+  ON public.game_sessions FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can create game sessions" ON public.game_sessions;
+CREATE POLICY "Authenticated users can create game sessions"
+  ON public.game_sessions FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ============================================
 -- INDEXES

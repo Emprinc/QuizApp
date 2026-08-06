@@ -55,7 +55,7 @@ GRANT SELECT ON public.achievements TO authenticated;
 GRANT SELECT ON public.user_achievements TO authenticated;
 GRANT SELECT ON public.challenges TO authenticated;
 GRANT SELECT ON public.user_challenge_progress TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.challenges TO authenticated;
+-- Challenges INSERT/UPDATE/DELETE via RPC only for admins/teachers (no direct table grant)
 
 ALTER TABLE public.coin_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
