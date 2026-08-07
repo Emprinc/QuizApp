@@ -7,10 +7,25 @@ import { getQuestionId } from '../lib/mathFormat'
 import { QUIZ_LENGTH } from '../lib/constants'
 
 export const quizService = {
+  async getTopicId(topicSlug) {
+    const { data, error } = await supabase
+      .from('topics')
+      .select('id')
+      .eq('slug', topicSlug)
+      .single()
+    if (error) {
+      console.error('Error resolving topic:', error)
+      return null
+    }
+    return data.id
+  },
+
   async getSkillScore(userId, topicSlug) {
+    const topicId = await this.getTopicId(topicSlug)
+    if (!topicId) return INITIAL_SKILL_SCORE
     const { data, error } = await supabase.rpc('get_skill_score', {
       p_user_id: userId,
-      p_topic_slug: topicSlug,
+      p_topic_id: topicId,
     })
     if (error) {
       console.error('Error fetching skill score:', error)
@@ -20,8 +35,9 @@ export const quizService = {
   },
 
   async getSeenQuestionIds(userId, topicSlug) {
+    const topicId = topicSlug ? await this.getTopicId(topicSlug) : null
     let query = supabase.from('seen_questions').select('question_hash').eq('user_id', userId)
-    if (topicSlug) query = query.eq('topic_slug', topicSlug)
+    if (topicId) query = query.eq('topic_id', topicId)
     const { data, error } = await query.limit(500)
     if (error) {
       console.error('Error fetching seen questions:', error)
@@ -31,9 +47,10 @@ export const quizService = {
   },
 
   async markQuestionSeen(userId, questionHash, topicSlug) {
+    const topicId = topicSlug ? await this.getTopicId(topicSlug) : null
     const { error } = await supabase
       .from('seen_questions')
-      .insert({ user_id: userId, question_hash: questionHash, topic_slug: topicSlug })
+      .insert({ user_id: userId, question_hash: questionHash, topic_id: topicId })
     if (error && !error.message.includes('duplicate')) {
       console.error('Error marking question seen:', error)
     }
@@ -48,12 +65,14 @@ export const quizService = {
   },
 
   async startAttempt(userId, topicSlug, difficulty) {
+    const topicId = await this.getTopicId(topicSlug)
+    if (!topicId) return null
     const { data, error } = await supabase
       .from('quiz_attempts')
       .insert({
         user_id: userId,
-        topic_slug: topicSlug,
-        difficulty,
+        topic_id: topicId,
+        difficulty: difficulty.toLowerCase(),
         score: 0,
         questions_answered: 0,
         questions_correct: 0,
@@ -86,10 +105,12 @@ export const quizService = {
   },
 
   async submitAttempt(userId, topicSlug, difficulty, score, questionsAnswered, questionsCorrect, coinsEarned) {
+    const topicId = await this.getTopicId(topicSlug)
+    if (!topicId) return null
     const { data, error } = await supabase.rpc('submit_quiz_attempt', {
       p_user_id: userId,
-      p_topic_slug: topicSlug,
-      p_difficulty: difficulty,
+      p_topic_id: topicId,
+      p_difficulty: difficulty.toLowerCase(),
       p_score: score,
       p_questions_answered: questionsAnswered,
       p_questions_correct: questionsCorrect,

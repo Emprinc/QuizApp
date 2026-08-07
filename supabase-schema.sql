@@ -167,9 +167,8 @@ CREATE TABLE IF NOT EXISTS public.friendships (
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  topic_id UUID REFERENCES public.topics(id) ON DELETE SET NULL,
-  topic_slug TEXT NOT NULL,
-  difficulty TEXT CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
+  topic_id UUID NOT NULL REFERENCES public.topics(id) ON DELETE RESTRICT,
+  difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard')),
   score INTEGER DEFAULT 0,
   questions_answered INTEGER DEFAULT 0,
   questions_correct INTEGER DEFAULT 0,
@@ -196,16 +195,16 @@ CREATE TABLE IF NOT EXISTS public.quiz_answers (
 
 CREATE TABLE IF NOT EXISTS public.user_skill_levels (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  topic_slug TEXT NOT NULL,
-  skill_score INTEGER DEFAULT 50,
+  topic_id UUID NOT NULL REFERENCES public.topics(id) ON DELETE CASCADE,
+  skill_score INTEGER DEFAULT 50 CHECK (skill_score BETWEEN 0 AND 100),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (user_id, topic_slug)
+  PRIMARY KEY (user_id, topic_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.seen_questions (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   question_hash TEXT NOT NULL,
-  topic_slug TEXT,
+  topic_id UUID REFERENCES public.topics(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (user_id, question_hash)
 );
@@ -232,17 +231,16 @@ CREATE TABLE IF NOT EXISTS public.achievements (
 );
 
 CREATE TABLE IF NOT EXISTS public.user_achievements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   achievement_id UUID NOT NULL REFERENCES public.achievements(id) ON DELETE CASCADE,
-  unlocked_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, achievement_id)
+  earned_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, achievement_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.challenges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   description TEXT NOT NULL,
-  topic_slug TEXT,
+  topic_id UUID REFERENCES public.topics(id) ON DELETE SET NULL,
   target_count INTEGER DEFAULT 10,
   coin_reward INTEGER DEFAULT 50,
   is_active BOOLEAN DEFAULT TRUE,
@@ -271,7 +269,7 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_user ON public.user_roles(user_id);
 CREATE INDEX IF NOT EXISTS idx_friendships_sender ON public.friendships(sender_id);
 CREATE INDEX IF NOT EXISTS idx_friendships_receiver ON public.friendships(receiver_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON public.quiz_attempts(user_id);
-CREATE INDEX IF NOT EXISTS idx_quiz_attempts_topic ON public.quiz_attempts(topic_slug);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_topic ON public.quiz_attempts(topic_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_answers_attempt ON public.quiz_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_answers_user ON public.quiz_answers(user_id);
 CREATE INDEX IF NOT EXISTS idx_seen_questions_user ON public.seen_questions(user_id);

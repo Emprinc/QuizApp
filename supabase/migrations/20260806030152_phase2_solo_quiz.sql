@@ -11,9 +11,8 @@ This file is idempotent and can be re-run safely.
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  topic_id UUID REFERENCES public.topics(id) ON DELETE SET NULL,
-  topic_slug TEXT NOT NULL,
-  difficulty TEXT CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
+  topic_id UUID NOT NULL REFERENCES public.topics(id) ON DELETE RESTRICT,
+  difficulty TEXT CHECK (difficulty IN ('easy', 'medium', 'hard')),
   score INTEGER DEFAULT 0,
   questions_answered INTEGER DEFAULT 0,
   questions_correct INTEGER DEFAULT 0,
@@ -40,22 +39,22 @@ CREATE TABLE IF NOT EXISTS public.quiz_answers (
 
 CREATE TABLE IF NOT EXISTS public.user_skill_levels (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  topic_slug TEXT NOT NULL,
-  skill_score INTEGER DEFAULT 50,
+  topic_id UUID NOT NULL REFERENCES public.topics(id) ON DELETE CASCADE,
+  skill_score INTEGER DEFAULT 50 CHECK (skill_score BETWEEN 0 AND 100),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (user_id, topic_slug)
+  PRIMARY KEY (user_id, topic_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.seen_questions (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   question_hash TEXT NOT NULL,
-  topic_slug TEXT,
+  topic_id UUID REFERENCES public.topics(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (user_id, question_hash)
 );
 
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON public.quiz_attempts(user_id);
-CREATE INDEX IF NOT EXISTS idx_quiz_attempts_topic ON public.quiz_attempts(topic_slug);
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_topic ON public.quiz_attempts(topic_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_answers_attempt ON public.quiz_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_answers_user ON public.quiz_answers(user_id);
 CREATE INDEX IF NOT EXISTS idx_seen_questions_user ON public.seen_questions(user_id);
@@ -109,7 +108,7 @@ CREATE POLICY "Users can insert own seen questions"
 
 CREATE OR REPLACE FUNCTION public.submit_quiz_attempt(
   p_user_id UUID,
-  p_topic_slug TEXT,
+  p_topic_id UUID,
   p_difficulty TEXT,
   p_score INTEGER,
   p_questions_answered INTEGER,
@@ -122,17 +121,17 @@ DECLARE
   current_skill INTEGER;
 BEGIN
   INSERT INTO public.quiz_attempts (
-    user_id, topic_slug, difficulty, score,
+    user_id, topic_id, difficulty, score,
     questions_answered, questions_correct, coins_earned,
     mode, finished_at
   ) VALUES (
-    p_user_id, p_topic_slug, p_difficulty, p_score,
+    p_user_id, p_topic_id, p_difficulty, p_score,
     p_questions_answered, p_questions_correct, p_coins_earned,
     'solo', NOW()
   ) RETURNING id INTO attempt_id;
 
   SELECT skill_score INTO current_skill FROM public.user_skill_levels
-    WHERE user_id = p_user_id AND topic_slug = p_topic_slug;
+    WHERE user_id = p_user_id AND topic_id = p_topic_id;
 
   IF current_skill IS NULL THEN
     current_skill := 50;
@@ -140,9 +139,9 @@ BEGIN
 
   new_skill_score := GREATEST(1, LEAST(100, ROUND(current_skill * 0.75 + (CASE WHEN p_questions_answered > 0 THEN (p_questions_correct::FLOAT / p_questions_answered) * 100 ELSE 0 END) * 0.25)));
 
-  INSERT INTO public.user_skill_levels (user_id, topic_slug, skill_score, updated_at)
-    VALUES (p_user_id, p_topic_slug, new_skill_score, NOW())
-    ON CONFLICT (user_id, topic_slug)
+  INSERT INTO public.user_skill_levels (user_id, topic_id, skill_score, updated_at)
+    VALUES (p_user_id, p_topic_id, new_skill_score, NOW())
+    ON CONFLICT (user_id, topic_id)
     DO UPDATE SET skill_score = EXCLUDED.skill_score, updated_at = NOW();
 
   PERFORM public.update_player_stats(p_user_id, 1, 0, p_score);
@@ -157,13 +156,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION public.get_skill_score(
   p_user_id UUID,
-  p_topic_slug TEXT
+  p_topic_id UUID
 ) RETURNS INTEGER AS $$
 DECLARE
   score INTEGER;
 BEGIN
   SELECT skill_score INTO score FROM public.user_skill_levels
-    WHERE user_id = p_user_id AND topic_slug = p_topic_slug;
+    WHERE user_id = p_user_id AND topic_id = p_topic_id;
   RETURN COALESCE(score, 50);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

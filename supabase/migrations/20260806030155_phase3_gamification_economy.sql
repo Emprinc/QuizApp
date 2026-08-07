@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.user_achievements (
 CREATE TABLE IF NOT EXISTS public.challenges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   description TEXT NOT NULL,
-  topic_slug TEXT,
+  topic_id UUID REFERENCES public.topics(id) ON DELETE SET NULL,
   target_count INTEGER DEFAULT 10,
   coin_reward INTEGER DEFAULT 50,
   is_active BOOLEAN DEFAULT TRUE,

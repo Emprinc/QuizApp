@@ -202,6 +202,57 @@ CREATE TABLE IF NOT EXISTS public.friendships (
 );
 
 -- ============================================
+-- ADDITIVE EXTENSIONS
+--
+-- The CREATE TABLE statements above keep this migration runnable on a fresh
+-- database. These ALTER statements are the canonical upgrade path for an
+-- existing baseline and are intentionally idempotent.
+-- ============================================
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS full_name TEXT,
+  ADD COLUMN IF NOT EXISTS school_id UUID REFERENCES public.schools(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS age INTEGER,
+  ADD COLUMN IF NOT EXISTS bio TEXT,
+  ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS total_games INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_wins INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_score INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS weekly_score INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS monthly_score INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 100,
+  ADD COLUMN IF NOT EXISTS hint_tokens INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS fifty_fifty_tokens INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS skip_question_tokens INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS mystery_boxes INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS double_coins_expires_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS active_border TEXT,
+  ADD COLUMN IF NOT EXISTS active_name_effect TEXT,
+  ADD COLUMN IF NOT EXISTS flair TEXT,
+  ADD COLUMN IF NOT EXISTS streak_days INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_reward_date DATE,
+  ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE public.questions
+  ADD COLUMN IF NOT EXISTS topic_id UUID REFERENCES public.topics(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS pool_name TEXT,
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS unhide_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS uploads_enabled BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS graph_data JSONB,
+  ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'bank';
+
+ALTER TABLE public.rooms
+  ADD COLUMN IF NOT EXISTS topic_id UUID REFERENCES public.topics(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'room',
+  ADD COLUMN IF NOT EXISTS max_players INTEGER DEFAULT 8;
+
+ALTER TABLE public.game_sessions
+  ADD COLUMN IF NOT EXISTS generated_question JSONB;
+
+-- ============================================
 -- FUNCTIONS
 -- ============================================
 
